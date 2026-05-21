@@ -2399,6 +2399,10 @@ def page_usuarios():
 
                 comunidad_auto = PROVINCIA_COMUNIDAD[provincia]
 
+            else:
+
+                comunidad_auto = comunidad
+
             new_pw = st.text_input("Nueva contraseña (dejar vacío para no cambiar)", type="password")
 
 
@@ -2407,7 +2411,7 @@ def page_usuarios():
 
                 kwargs = dict(nombre=nombre, apellidos=apellidos, email=email,
 
-                              telefono=telefono, role=role, comunidad_autonoma=comunidad,
+                              telefono=telefono, role=role, comunidad_autonoma=comunidad_auto,
 
                               horas_semanales=horas, dias_vacaciones_anuales=dias_vac,
 
@@ -2493,11 +2497,13 @@ def page_usuarios():
 
                     try:
 
+                        comunidad_final = PROVINCIA_COMUNIDAD.get(provincia_new, comunidad) if provincia_new else comunidad
+
                         uid = db.create_user(username, password, nombre, apellidos, email,
 
                                              role, dept_opts.get(list(dept_opts.keys())[0]),
 
-                                             mgr_opts[mgr_sel], comunidad, horas, dias_vac)
+                                             mgr_opts[mgr_sel], comunidad_final, horas, dias_vac)
 
                         db.update_user(uid, provincia=provincia_new, localidad=localidad_new)
 
