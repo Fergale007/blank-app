@@ -508,7 +508,7 @@ def render_sidebar():
 
 
 
-        nav_options = ["⏱️ Fichaje", "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}"]
+        nav_options = ["⏱️ Fichaje", "👤 Mi Perfil", "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}"]
 
         if is_role("manager", "admin"):
 
@@ -558,6 +558,156 @@ def render_sidebar():
 
 
 
+
+# ── Page: Mi Perfil ───────────────────────────────────────────────────────────
+
+
+
+def page_perfil():
+
+    user = current_user()
+
+    st.title("👤 Mi Perfil")
+
+
+
+    # ── Info card ─────────────────────────────────────────────────────────────
+
+    try:
+
+        from zoneinfo import ZoneInfo
+
+        _tz_name = db.get_user_tz(user) if hasattr(db, 'get_user_tz') else "Europe/Madrid"
+
+        zona_txt = "🌴 Canarias (Atlantic/Canary)" if _tz_name == "Atlantic/Canary" else "🇪🇸 Península (Europe/Madrid)"
+
+    except Exception:
+
+        zona_txt = "Europe/Madrid"
+
+
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Nombre", f"{user.get('nombre','')} {user.get('apellidos','')}")
+
+    c2.metric("Rol", user.get("role","").upper())
+
+    c3.metric("Usuario", user.get("username",""))
+
+
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.markdown("**📧 Email**")
+
+        st.write(user.get("email") or "—")
+
+        st.markdown("**📍 Provincia**")
+
+        st.write(user.get("provincia") or "—")
+
+        st.markdown("**🏙️ Localidad**")
+
+        st.write(user.get("localidad") or "—")
+
+    with col2:
+
+        st.markdown("**🕐 Zona horaria (auto)**")
+
+        st.write(zona_txt)
+
+        st.markdown("**⏰ Horas semanales**")
+
+        st.write(f"{user.get('horas_semanales', 40)}h")
+
+        st.markdown("**🏖️ Días de vacaciones / año**")
+
+        st.write(str(user.get("dias_vacaciones_anuales", 22)))
+
+
+
+    # ── Vacation balance ──────────────────────────────────────────────────────
+
+    bal = db.get_vacation_balance(user["id"], __import__("datetime").date.today().year)
+
+    st.markdown("---")
+
+    st.subheader("🏖️ Balance vacaciones")
+
+    bc1, bc2, bc3, bc4 = st.columns(4)
+
+    bc1.metric("Total", bal["total"])
+
+    bc2.metric("Disfrutados", bal["used"])
+
+    bc3.metric("Pendientes aprobación", bal["pending"])
+
+    bc4.metric("Disponibles", bal["remaining"])
+
+
+
+    # ── Change password ───────────────────────────────────────────────────────
+
+    st.markdown("---")
+
+    st.subheader("🔑 Cambiar contraseña")
+
+    with st.form("cambiar_pw_form"):
+
+        pw_actual  = st.text_input("Contraseña actual", type="password")
+
+        pw_nueva   = st.text_input("Nueva contraseña", type="password")
+
+        pw_confirm = st.text_input("Confirmar nueva contraseña", type="password")
+
+        if st.form_submit_button("Cambiar contraseña"):
+
+            if not pw_actual or not pw_nueva:
+
+                st.error("Rellena todos los campos.")
+
+            elif pw_nueva != pw_confirm:
+
+                st.error("Las contraseñas nuevas no coinciden.")
+
+            elif len(pw_nueva) < 8:
+
+                st.error("La nueva contraseña debe tener al menos 8 caracteres.")
+
+            else:
+
+                verified = db.authenticate(user["username"], pw_actual)
+
+                if not verified:
+
+                    st.error("La contraseña actual no es correcta.")
+
+                else:
+
+                    db.update_user(user["id"], password=pw_nueva)
+
+                    db.audit(user["id"], "cambiar_password", "users", user["id"])
+
+                    st.success("✅ Contraseña actualizada correctamente.")
+
+
+
+    # ── Admin note ────────────────────────────────────────────────────────────
+
+    if not is_role("admin"):
+
+        st.info("ℹ️ Para modificar tu provincia, localidad, email o datos laborales, contacta con el administrador.")
+
+    else:
+
+        st.info("✏️ Para editar todos los datos del perfil ve a **👤 Usuarios**.")
+
+
 # ── Page: Fichaje ─────────────────────────────────────────────────────────────
 
 
@@ -568,13 +718,19 @@ def page_fichaje():
 
 
 
-    # ── Auto timezone from provincia ──────────────────────────────────────────
+    # ── Timezone: auto from provincia + manual override ──────────────────────
 
     try:
 
         from zoneinfo import ZoneInfo
 
-        _tz_name = db.get_user_tz(user) if hasattr(db, 'get_user_tz') else "Europe/Madrid"
+        _auto_tz = db.get_user_tz(user) if hasattr(db, 'get_user_tz') else "Europe/Madrid"
+
+        # Manual override stored in session_state
+
+        _tz_override = st.session_state.get("tz_override", None)
+
+        _tz_name = _tz_override if _tz_override else _auto_tz
 
         _tz  = ZoneInfo(_tz_name)
 
@@ -582,9 +738,15 @@ def page_fichaje():
 
     except Exception:
 
+        _auto_tz = "Europe/Madrid"
+
+        _tz_name = "Europe/Madrid"
+
         _now = datetime.now()
 
-    zona_label = "🌴 Canarias" if user.get("comunidad_autonoma") == "canarias" else "🇪🇸 Península"
+    _is_canary = _tz_name == "Atlantic/Canary"
+
+    zona_label = "🌴 Canarias" if _is_canary else "🇪🇸 Península"
 
 
 
@@ -744,9 +906,9 @@ def page_fichaje():
 
 
 
-    # ── Config row (jornada + hora) ────────────────────────────────────────────
+    # ── Config row (jornada + hora + zona horaria) ──────────────────────────────
 
-    col_j, col_h, col_obs = st.columns([2, 1, 3])
+    col_j, col_h, col_tz, col_obs = st.columns([2, 1, 1.5, 3])
 
     with col_j:
 
@@ -763,6 +925,26 @@ def page_fichaje():
     with col_h:
 
         hora_manual_cb = st.checkbox("⏱ Hora manual", key="hora_manual_cb")
+
+    with col_tz:
+
+        _tz_opts = ["Auto", "🌴 Canarias", "🇪🇸 Península"]
+
+        _tz_idx  = 1 if _is_canary and st.session_state.get("tz_override") else 2 if not _is_canary and st.session_state.get("tz_override") else 0
+
+        _tz_sel  = st.selectbox("Zona horaria", _tz_opts, index=_tz_idx, key="tz_sel", help="Anula la zona horaria automática")
+
+        if _tz_sel == "🌴 Canarias":
+
+            st.session_state["tz_override"] = "Atlantic/Canary"
+
+        elif _tz_sel == "🇪🇸 Península":
+
+            st.session_state["tz_override"] = "Europe/Madrid"
+
+        else:
+
+            st.session_state["tz_override"] = None
 
     with col_obs:
 
@@ -2966,7 +3148,11 @@ def main():
 
 
 
-    if "Fichaje" in clean:
+    if "Perfil" in clean:
+
+        page_perfil()
+
+    elif "Fichaje" in clean:
 
         page_fichaje()
 
