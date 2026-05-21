@@ -680,20 +680,59 @@ def page_calendario():
     last_day = calendar.monthrange(año, mes)[1]
     f_fin = date(año, mes, last_day)
     entries_mes = db.get_entries_range(user["id"], f_ini, f_fin)
+
+    # Build full month grid (all working days, even with 0 hours)
+    hoy_local = date.today()
+    all_days = [date(año, mes, d) for d in range(1, last_day + 1)
+                if date(año, mes, d).weekday() < 5               # skip weekends
+                and date(año, mes, d) <= hoy_local]              # skip future
+
     if entries_mes:
         df = pd.DataFrame(entries_mes)
-        df_by_day = df.groupby("fecha").apply(
-            lambda g: db.calc_worked_hours(g.to_dict("records"))
-        ).reset_index(name="horas")
-        if not df_by_day.empty:
-            fig = px.bar(df_by_day, x="fecha", y="horas",
-                         title=f"Horas trabajadas — {MESES_ES[mes-1]} {año}",
-                         labels={"fecha": "Fecha", "horas": "Horas"},
-                         color="horas", color_continuous_scale="Blues")
-            fig.add_hline(y=8, line_dash="dash", line_color="#6366f1", annotation_text="8h")
-            fig.add_hline(y=9, line_dash="dash", line_color="#ef4444", annotation_text="Máx. 9h")
-            fig.update_layout(showlegend=False, coloraxis_showscale=False, height=280)
-            st.plotly_chart(fig, use_container_width=True)
+        worked_by_day = (
+            df.groupby("fecha")
+            .apply(lambda g: db.calc_worked_hours(g.to_dict("records")))
+            .to_dict()
+        )
+    else:
+        worked_by_day = {}
+
+    if all_days:
+        days_str  = [d.strftime("%d %b") for d in all_days]
+        hours     = [worked_by_day.get(str(d), 0.0) for d in all_days]
+        bar_colors = [
+            "#10b981" if h >= 8 else
+            "#f59e0b" if h > 0  else
+            "#ef4444"
+            for h in hours
+        ]
+
+        fig = go.Figure(go.Bar(
+            x=days_str,
+            y=hours,
+            marker_color=bar_colors,
+            text=[fmt_h(h) if h > 0 else "" for h in hours],
+            textposition="outside",
+            hovertemplate="<b>%{x}</b><br>%{y:.2f}h trabajadas<extra></extra>",
+        ))
+        fig.add_hline(y=8, line_dash="dash", line_color="#6366f1",
+                      annotation_text="8h objetivo", annotation_position="right")
+        fig.add_hline(y=9, line_dash="dash", line_color="#ef4444",
+                      annotation_text="Máx. 9h", annotation_position="right")
+        fig.update_layout(
+            title=dict(text=f"Horas trabajadas — {MESES_ES[mes-1]} {año}",
+                       font=dict(size=15)),
+            xaxis=dict(title="", tickangle=-45, tickfont=dict(size=11)),
+            yaxis=dict(title="Horas", range=[0, max(max(hours, default=0) * 1.2, 10)]),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            height=320,
+            margin=dict(t=50, b=60, l=40, r=80),
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        # Mini legend
+        st.caption("🟢 ≥ 8h completo &nbsp; 🟡 parcial &nbsp; 🔴 sin registros")
 
 # ── Page: Vacaciones ──────────────────────────────────────────────────────────
 
