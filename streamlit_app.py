@@ -513,10 +513,25 @@ def page_fichaje():
                 "Observación (opcional)" if es_hoy else "Motivo / justificación *",
                 placeholder="" if es_hoy else "Obligatorio para fechas pasadas",
             )
+            reemplazar = st.checkbox(
+                "Reemplazar registro existente del mismo tipo",
+                value=True,
+                help="Si ya hay una Entrada/Salida de ese tipo en esa fecha, se elimina la antigua y se guarda la nueva hora.",
+            )
             if st.form_submit_button("💾 Guardar fichaje", use_container_width=True):
                 if not es_hoy and not obs_m.strip():
                     st.error("El motivo es obligatorio para fechas pasadas.")
                 else:
+                    if reemplazar:
+                        # Soft-delete ALL existing entries of the same tipo on that date
+                        existing = db.get_day_entries(user["id"], fecha_m)
+                        for old_e in existing:
+                            if old_e["tipo"] == tipo_m:
+                                db.soft_delete_entry(old_e["id"], user["id"])
+                                db.audit(user["id"], "delete_entry_replaced",
+                                         "time_entries", old_e["id"],
+                                         {"fecha": str(fecha_m), "tipo": tipo_m,
+                                          "hora_old": old_e["hora"]})
                     db.add_entry(user["id"], fecha_m, tipo_m,
                                  hora_m.strftime("%H:%M"),
                                  observaciones=obs_m, is_manual=True,
