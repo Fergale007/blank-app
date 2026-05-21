@@ -378,26 +378,33 @@ def get_fichaje_state(user_id, fecha):
 # ── Worked hours ──────────────────────────────────────────────────────────────
 
 def calc_worked_hours(entries):
-    """Calculate net worked hours from a list of entries for one day."""
+    """Calculate net worked hours from a list of entries for one day.
+    Handles duplicate entry types by always pairing the earliest unmatched one."""
+    sorted_entries = sorted(entries, key=lambda x: x["hora"])
     entrada = None
     pausa_start = None
     total = 0.0
     pausa_total = 0.0
-    for e in sorted(entries, key=lambda x: x["hora"]):
+    for e in sorted_entries:
         t = e["tipo"]
         h = e["hora"][:5]
         try:
             dt = datetime.strptime(h, "%H:%M")
             if t == "entrada":
-                entrada = dt
-            elif t == "salida" and entrada:
-                total += (dt - entrada).total_seconds() / 3600
-                entrada = None
+                # Only set if we don't already have an open entrada
+                if entrada is None:
+                    entrada = dt
+            elif t == "salida":
+                if entrada is not None:
+                    total += (dt - entrada).total_seconds() / 3600
+                    entrada = None
             elif t == "pausa":
-                pausa_start = dt
-            elif t == "fin_pausa" and pausa_start:
-                pausa_total += (dt - pausa_start).total_seconds() / 3600
-                pausa_start = None
+                if pausa_start is None:
+                    pausa_start = dt
+            elif t == "fin_pausa":
+                if pausa_start is not None:
+                    pausa_total += (dt - pausa_start).total_seconds() / 3600
+                    pausa_start = None
         except Exception:
             pass
     net = max(0.0, total - pausa_total)
