@@ -438,28 +438,35 @@ def page_fichaje():
     with col_tl:
         st.markdown(f"##### 📋 Registros de hoy — {hoy.strftime('%d/%m/%Y')}")
         if entries:
-            colors = {
+            TIPO_COLORS = {
                 "entrada":   ("#d1fae5", "#065f46", "🟢"),
                 "salida":    ("#fee2e2", "#991b1b", "🔴"),
                 "pausa":     ("#fef3c7", "#92400e", "🟡"),
                 "fin_pausa": ("#ede9fe", "#5b21b6", "🟣"),
             }
             for e in entries:
-                bg, fg, ico = colors.get(e['tipo'], ("#f1f5f9","#475569","⚪"))
+                bg, fg, ico = TIPO_COLORS.get(e['tipo'], ("#f1f5f9","#475569","⚪"))
                 extra = []
                 if e["is_manual"]: extra.append("✏️ Manual")
                 if e.get("observaciones"): extra.append(e["observaciones"])
-                extra_html = (f'<div style="font-size:.76rem;color:#94a3b8">{" · ".join(extra)}</div>'
-                              if extra else "")
-                st.markdown(f"""
-                <div class="tl-row">
-                  <div class="tl-icon" style="background:{bg};color:{fg}">{ico}</div>
-                  <div>
-                    <span style="font-weight:700;color:#1e293b">{e['hora'][:5]}</span>
-                    <span style="color:#64748b;margin-left:8px">{e['tipo'].replace('_',' ').title()}</span>
-                    {extra_html}
-                  </div>
-                </div>""", unsafe_allow_html=True)
+                c_ico, c_txt, c_del = st.columns([0.4, 4, 0.6])
+                with c_ico:
+                    st.markdown(
+                        f'<div class="tl-icon" style="background:{bg};color:{fg};margin-top:6px">{ico}</div>',
+                        unsafe_allow_html=True)
+                with c_txt:
+                    label = f"**{e['hora'][:5]}** — {e['tipo'].replace('_',' ').title()}"
+                    if extra:
+                        label += f"  \n*{' · '.join(extra)}*"
+                    st.markdown(label)
+                with c_del:
+                    if st.button("🗑️", key=f"del_{e['id']}",
+                                 help="Eliminar este registro",
+                                 use_container_width=True):
+                        db.soft_delete_entry(e["id"], user["id"])
+                        db.audit(user["id"], "delete_entry", "time_entries", e["id"],
+                                 {"fecha": str(hoy), "tipo": e["tipo"], "hora": e["hora"]})
+                        st.rerun()
         else:
             st.markdown("""
             <div style="text-align:center;padding:40px 20px;color:#94a3b8">
