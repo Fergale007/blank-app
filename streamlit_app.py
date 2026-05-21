@@ -259,18 +259,38 @@ def render_sidebar():
 # ── Page: Fichaje ─────────────────────────────────────────────────────────────
 
 def page_fichaje():
+    user = current_user()
+
+    # ── Selector de zona horaria (persiste en session_state) ──────────────────
+    _TZ_OPTIONS = {
+        "Canarias (UTC+0/+1)":    "Atlantic/Canary",
+        "Peninsula (UTC+1/+2)": "Europe/Madrid",
+    }
+    _default_key = ("Canarias (UTC+0/+1)"
+                    if user.get("comunidad_autonoma") == "canarias"
+                    else "Peninsula (UTC+1/+2)")
+    if "tz_label" not in st.session_state:
+        st.session_state["tz_label"] = _default_key
+
+    _tz_col, _ = st.columns([1, 4])
+    with _tz_col:
+        _tz_label = st.selectbox(
+            "Zona horaria",
+            list(_TZ_OPTIONS.keys()),
+            index=list(_TZ_OPTIONS.keys()).index(st.session_state.get("tz_label", _default_key)),
+            key="tz_label",
+        )
+
     try:
         from zoneinfo import ZoneInfo
-        _tz = ZoneInfo("Atlantic/Canary" if current_user().get("comunidad_autonoma") == "canarias"
-                       else "Europe/Madrid")
+        _tz  = ZoneInfo(_TZ_OPTIONS[_tz_label])
         _now = datetime.now(_tz)
     except Exception:
         _now = datetime.now()
 
-    user = current_user()
-    hoy  = _now.date()
+    hoy   = _now.date()
     ahora = _now.strftime("%H:%M")
-    zona_label = "🌴 Canarias" if user.get("comunidad_autonoma") == "canarias" else "🇪🇸 Península"
+    zona_label = _tz_label
 
     entries = db.get_day_entries(user["id"], hoy)
     state   = db.get_fichaje_state(user["id"], hoy)
