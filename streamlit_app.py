@@ -259,146 +259,250 @@ def render_sidebar():
 # ── Page: Fichaje ─────────────────────────────────────────────────────────────
 
 def page_fichaje():
-    user = current_user()
-    hoy = date.today()
-    ahora = datetime.now().strftime("%H:%M")
+    from zoneinfo import ZoneInfo
 
-    st.title("⏱️ Fichaje")
-    st.caption(f"{hoy.strftime('%A, %d de %B de %Y').capitalize()} · {ahora}")
+    user = current_user()
+
+    # ── Timezone-aware time (Canarias = Atlantic/Canary, resto = Europe/Madrid) ─
+    _tz = ZoneInfo("Atlantic/Canary" if user.get("comunidad_autonoma") == "canarias"
+                   else "Europe/Madrid")
+    _now = datetime.now(_tz)
+    hoy  = _now.date()
+    ahora = _now.strftime("%H:%M")
+    zona_label = "🌴 Canarias" if user.get("comunidad_autonoma") == "canarias" else "🇪🇸 Península"
 
     entries = db.get_day_entries(user["id"], hoy)
-    state = db.get_fichaje_state(user["id"], hoy)
-    worked = db.calc_worked_hours(entries)
-
-    # Status bar
+    state   = db.get_fichaje_state(user["id"], hoy)
+    worked  = db.calc_worked_hours(entries)
     last_hora = entries[-1]['hora'][:5] if entries else "--:--"
-    status_text = {
-        None: ("dot-libre", "Sin fichar hoy"),
-        "entrada": ("dot-trabajando", f"Trabajando desde {last_hora}"),
-        "pausa": ("dot-pausado", f"En pausa desde {last_hora}"),
-        "fin_pausa": ("dot-trabajando", f"Trabajando (tras pausa) desde {last_hora}"),
-        "salida": ("dot-completo", f"Jornada finalizada · {fmt_h(worked)} trabajadas"),
-    }.get(state, ("dot-libre", "—"))
-    dot_cls, status_msg = status_text
+
+    # ── Extra CSS ──────────────────────────────────────────────────────────────
+    st.markdown("""<style>
+    .ficha-hero {
+        background: linear-gradient(135deg,#1e1f2e 0%,#2d2f45 100%);
+        border-radius:20px; padding:28px 32px; margin-bottom:20px;
+        display:flex; align-items:center; justify-content:space-between;
+        box-shadow:0 8px 32px rgba(0,0,0,.2);
+    }
+    .ficha-time  { font-size:3.2rem; font-weight:800; color:white; letter-spacing:-2px; line-height:1; }
+    .ficha-date  { font-size:.9rem; color:#a0aec0; margin-top:4px; }
+    .status-pill {
+        display:inline-flex; align-items:center; gap:8px;
+        padding:10px 20px; border-radius:50px; font-weight:600; font-size:.95rem;
+        box-shadow:0 4px 12px rgba(0,0,0,.2);
+    }
+    .pill-libre      { background:rgba(148,163,184,.2); color:#94a3b8; }
+    .pill-trabajando { background:rgba(16,185,129,.2);  color:#34d399; border:1px solid rgba(16,185,129,.35); }
+    .pill-pausado    { background:rgba(245,158,11,.2);  color:#fbbf24; border:1px solid rgba(245,158,11,.35); }
+    .pill-completo   { background:rgba(99,102,241,.2);  color:#a5b4fc; border:1px solid rgba(99,102,241,.35); }
+    .tl-row {
+        display:flex; align-items:center; gap:12px;
+        padding:10px 0; border-bottom:1px solid #f1f5f9;
+    }
+    .tl-icon {
+        width:36px; height:36px; border-radius:50%; display:flex;
+        align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;
+    }
+    </style>""", unsafe_allow_html=True)
+
+    # ── Hero card ──────────────────────────────────────────────────────────────
+    pill_cls = {"entrada":"pill-trabajando","fin_pausa":"pill-trabajando",
+                "pausa":"pill-pausado","salida":"pill-completo"}.get(state,"pill-libre")
+    pill_txt = {
+        None:       "● Sin fichar hoy",
+        "entrada":  f"● Trabajando desde {last_hora}",
+        "pausa":    f"● En pausa desde {last_hora}",
+        "fin_pausa":f"● Activo tras pausa ({last_hora})",
+        "salida":   f"✓ Jornada finalizada",
+    }.get(state, "—")
+
+    pct    = min(int(worked / 8 * 100), 100)
+    bar_color = "#ef4444" if worked > 9 else "#10b981" if worked >= 8 else "#6366f1"
+    overtime_badge = ('<span style="background:#fca5a5;color:#991b1b;padding:2px 8px;'
+                      'border-radius:10px;font-size:.72rem;font-weight:700;margin-left:8px">⚠ +9h</span>'
+                      if worked > 9 else "")
 
     st.markdown(f"""
-    <div class="status-bar" style="margin-bottom:20px">
-        <div class="status-dot {dot_cls}"></div>
-        <div>
-            <div style="font-weight:600;color:#1e293b">{status_msg}</div>
-            <div style="font-size:.8rem;color:#64748b">Horas netas hoy: <b>{fmt_h(worked)}</b></div>
+    <div class="ficha-hero">
+      <div>
+        <div class="ficha-time">{ahora}</div>
+        <div class="ficha-date">{_now.strftime('%A, %d de %B de %Y').capitalize()} &nbsp;·&nbsp; {zona_label}</div>
+        <div style="margin-top:18px">
+          <div style="font-size:.78rem;color:#94a3b8;margin-bottom:5px">
+            Horas trabajadas hoy {overtime_badge}
+          </div>
+          <div style="background:rgba(255,255,255,.12);border-radius:20px;height:8px;width:220px;overflow:hidden">
+            <div style="background:{bar_color};height:100%;width:{pct}%;border-radius:20px;transition:width .4s"></div>
+          </div>
+          <div style="font-size:.82rem;color:#c9cde6;margin-top:5px"><b>{fmt_h(worked)}</b> de 8h objetivo</div>
         </div>
-        {f'<div class="badge badge-rojo" style="margin-left:auto">⚠ Supera 9h (Art.34.3 ET)</div>' if worked > 9 else ''}
+      </div>
+      <div style="text-align:right">
+        <div class="status-pill {pill_cls}">{pill_txt}</div>
+        <div style="margin-top:10px;font-size:.78rem;color:#6b7280">
+          Usuario: <b style="color:#a0aec0">{user.get('nombre','')}</b>
+        </div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    left, right = st.columns([1, 1])
+    # ── Config row (jornada + hora) ────────────────────────────────────────────
+    col_j, col_h, col_obs = st.columns([2, 1, 3])
+    with col_j:
+        tipo_jornada = st.selectbox(
+            "Modalidad",
+            ["🏢 Presencial", "🏠 Teletrabajo", "🔄 Mixta", "🚗 Desplazamiento"],
+            key="tipo_jornada",
+        )
+    with col_h:
+        hora_manual_cb = st.toggle("⏱ Hora manual", key="hora_manual_cb")
+    with col_obs:
+        obs = st.text_input("Observación (opcional)",
+                            placeholder="Ej: Reunión con cliente…",
+                            key="obs_fichaje",
+                            label_visibility="collapsed")
 
-    with left:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("#### Registrar fichaje")
-        tipo_jornada = st.selectbox("Tipo de jornada",
-                                     ["presencial", "teletrabajo", "mixta", "desplazamiento"],
-                                     key="tipo_jornada")
-        obs = st.text_input("Observación (opcional)", key="obs_fichaje")
-        hora_manual_cb = st.checkbox("Ajustar hora manualmente")
-        if hora_manual_cb:
-            hora_input = st.time_input("Hora", value=datetime.now().time().replace(second=0, microsecond=0))
-            hora_str = hora_input.strftime("%H:%M")
-        else:
-            hora_str = datetime.now().strftime("%H:%M")
+    if hora_manual_cb:
+        hora_input = st.time_input(
+            "Hora del fichaje",
+            value=_now.time().replace(second=0, microsecond=0),
+            step=60,
+            key="hora_input_manual",
+        )
+        hora_str = hora_input.strftime("%H:%M")
+    else:
+        hora_str = ahora
 
-        st.markdown("<br>", unsafe_allow_html=True)
+    # ── Action buttons ─────────────────────────────────────────────────────────
+    can_entrada   = state is None
+    can_pausa     = state in ("entrada", "fin_pausa")
+    can_fin_pausa = state == "pausa"
+    can_salida    = state in ("entrada", "fin_pausa")
 
-        # Button logic
-        can_entrada   = state is None
-        can_pausa     = state in ("entrada", "fin_pausa")
-        can_fin_pausa = state == "pausa"
-        can_salida    = state in ("entrada", "fin_pausa")
+    def fichar(tipo):
+        eid = db.add_entry(user["id"], hoy, tipo, hora_str,
+                           observaciones=obs,
+                           is_manual=hora_manual_cb,
+                           created_by=user["id"])
+        db.audit(user["id"], f"fichaje_{tipo}", "time_entries", eid,
+                 {"fecha": str(hoy), "hora": hora_str})
+        st.rerun()
 
-        def fichar(tipo):
-            eid = db.add_entry(user["id"], hoy, tipo, hora_str,
-                               observaciones=obs,
-                               is_manual=hora_manual_cb,
-                               created_by=user["id"])
-            db.audit(user["id"], f"fichaje_{tipo}", "time_entries", eid,
-                     {"fecha": str(hoy), "hora": hora_str})
-            st.rerun()
+    active = []
+    if can_entrada:   active.append(("entrada",   "🟢 ENTRADA",   "primary"))
+    if can_pausa:     active.append(("pausa",     "🟡 PAUSA",     "secondary"))
+    if can_fin_pausa: active.append(("fin_pausa", "🟣 REANUDAR",  "primary"))
+    if can_salida:    active.append(("salida",    "🔴 SALIDA",    "secondary"))
 
-        c1, c2 = st.columns(2)
-        with c1:
-            if can_entrada:
-                if st.button("🟢  ENTRADA", use_container_width=True, type="primary"):
-                    fichar("entrada")
-            if can_fin_pausa:
-                if st.button("🟣  FIN PAUSA", use_container_width=True, type="primary"):
-                    fichar("fin_pausa")
-        with c2:
-            if can_pausa:
-                if st.button("🟡  PAUSA", use_container_width=True):
-                    fichar("pausa")
-            if can_salida:
-                if st.button("🔴  SALIDA", use_container_width=True):
+    if active:
+        btn_cols = st.columns(len(active))
+        for idx, (tipo, label, btype) in enumerate(active):
+            with btn_cols[idx]:
+                if st.button(label, use_container_width=True,
+                             type="primary" if btype == "primary" else "secondary",
+                             key=f"btn_{tipo}"):
                     worked_at_exit = db.calc_worked_hours(entries)
-                    fichar("salida")
-                    if worked_at_exit > 9:
+                    fichar(tipo)
+                    if tipo == "salida" and worked_at_exit > 9:
                         db.create_incident(user["id"], hoy, "jornada_excesiva",
                                            f"Jornada de {worked_at_exit:.2f}h supera 9h (Art.34.3 ET)")
+    elif state == "salida":
+        st.success("✅ ¡Jornada completada! Buen descanso.")
 
-        if state == "salida":
-            st.success("✅ Jornada completada correctamente.")
+    st.divider()
 
-        st.markdown('</div>', unsafe_allow_html=True)
+    # ── Timeline + stats ───────────────────────────────────────────────────────
+    col_tl, col_stats = st.columns([3, 2])
 
-    with right:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown(f"#### Registros de hoy — {hoy.strftime('%d/%m/%Y')}")
-
+    with col_tl:
+        st.markdown(f"##### 📋 Registros de hoy — {hoy.strftime('%d/%m/%Y')}")
         if entries:
-            tipo_icons = {"entrada": "🟢", "salida": "🔴", "pausa": "🟡", "fin_pausa": "🟣"}
+            colors = {
+                "entrada":   ("#d1fae5", "#065f46", "🟢"),
+                "salida":    ("#fee2e2", "#991b1b", "🔴"),
+                "pausa":     ("#fef3c7", "#92400e", "🟡"),
+                "fin_pausa": ("#ede9fe", "#5b21b6", "🟣"),
+            }
             for e in entries:
-                manual_tag = " ✏️" if e["is_manual"] else ""
-                obs_tag = f" · *{e['observaciones']}*" if e["observaciones"] else ""
-                st.markdown(
-                    f"{tipo_icons.get(e['tipo'],'⚪')} **{e['hora'][:5]}** — "
-                    f"{e['tipo'].replace('_',' ').title()}{manual_tag}{obs_tag}"
-                )
-            st.divider()
-            st.metric("Horas trabajadas netas", fmt_h(worked))
-            if worked > 9:
-                st.error("⚠️ Supera 9h diarias (Art. 34.3 ET)")
-            elif worked > 8:
-                st.warning(f"Jornada extendida: {fmt_h(worked)}")
+                bg, fg, ico = colors.get(e['tipo'], ("#f1f5f9","#475569","⚪"))
+                extra = []
+                if e["is_manual"]: extra.append("✏️ Manual")
+                if e.get("observaciones"): extra.append(e["observaciones"])
+                extra_html = (f'<div style="font-size:.76rem;color:#94a3b8">{" · ".join(extra)}</div>'
+                              if extra else "")
+                st.markdown(f"""
+                <div class="tl-row">
+                  <div class="tl-icon" style="background:{bg};color:{fg}">{ico}</div>
+                  <div>
+                    <span style="font-weight:700;color:#1e293b">{e['hora'][:5]}</span>
+                    <span style="color:#64748b;margin-left:8px">{e['tipo'].replace('_',' ').title()}</span>
+                    {extra_html}
+                  </div>
+                </div>""", unsafe_allow_html=True)
         else:
-            st.info("Sin registros hoy. Pulsa ENTRADA para comenzar.")
+            st.markdown("""
+            <div style="text-align:center;padding:40px 20px;color:#94a3b8">
+              <div style="font-size:2.5rem;margin-bottom:8px">⏰</div>
+              <div>Sin registros hoy.<br>Pulsa <b>ENTRADA</b> para comenzar.</div>
+            </div>""", unsafe_allow_html=True)
 
-        # Fichaje manual para otro día
-        with st.expander("✏️ Añadir fichaje manual en otra fecha"):
-            with st.form("manual_form"):
-                fecha_m = st.date_input("Fecha", value=hoy)
+    with col_stats:
+        st.markdown("##### 📊 Resumen del día")
+        st.markdown(f"""
+        <div class="card" style="text-align:center;padding:24px">
+          <div style="font-size:2.8rem;font-weight:800;color:#4f46e5;line-height:1">{fmt_h(worked)}</div>
+          <div style="font-size:.82rem;color:#64748b;margin:6px 0 14px">trabajadas hoy</div>
+          <div style="background:#f1f5f9;border-radius:20px;height:10px;overflow:hidden">
+            <div style="background:{bar_color};height:100%;width:{pct}%;border-radius:20px"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#94a3b8;margin-top:4px">
+            <span>0h</span><span>8h</span>
+          </div>
+        </div>""", unsafe_allow_html=True)
+        if worked > 9:
+            st.error("⚠️ Supera 9h diarias (Art. 34.3 ET)")
+        elif worked > 8:
+            st.warning(f"Jornada extendida: {fmt_h(worked)}")
+        elif worked >= 8 and state == "salida":
+            st.success("✅ Jornada completa")
+
+    # ── Corrección manual ──────────────────────────────────────────────────────
+    with st.expander("✏️ Corregir o añadir fichaje en otra fecha"):
+        with st.form("manual_form"):
+            mc1, mc2, mc3 = st.columns(3)
+            with mc1:
+                fecha_m = st.date_input("Fecha", value=hoy, max_value=hoy)
+            with mc2:
                 tipo_m = st.selectbox("Tipo", ["entrada", "salida", "pausa", "fin_pausa"])
-                hora_m = st.time_input("Hora")
-                obs_m = st.text_input("Motivo / justificación *")
-                if st.form_submit_button("Guardar"):
-                    if not obs_m:
-                        st.error("El motivo es obligatorio para fichajes manuales.")
-                    else:
-                        db.add_entry(user["id"], fecha_m, tipo_m,
-                                     hora_m.strftime("%H:%M"),
-                                     observaciones=obs_m, is_manual=True,
-                                     created_by=user["id"])
-                        db.audit(user["id"], "fichaje_manual", "time_entries",
-                                 datos={"fecha": str(fecha_m), "tipo": tipo_m})
-                        st.success("Fichaje manual añadido.")
-                        st.rerun()
+            with mc3:
+                hora_m = st.time_input(
+                    "Hora",
+                    value=_now.time().replace(second=0, microsecond=0),
+                    step=60,
+                )
+            es_hoy = (fecha_m == hoy)
+            obs_m = st.text_input(
+                "Observación (opcional)" if es_hoy else "Motivo / justificación *",
+                placeholder="" if es_hoy else "Obligatorio para fechas pasadas",
+            )
+            if st.form_submit_button("💾 Guardar fichaje", use_container_width=True):
+                if not es_hoy and not obs_m.strip():
+                    st.error("El motivo es obligatorio para fechas pasadas.")
+                else:
+                    db.add_entry(user["id"], fecha_m, tipo_m,
+                                 hora_m.strftime("%H:%M"),
+                                 observaciones=obs_m, is_manual=True,
+                                 created_by=user["id"])
+                    db.audit(user["id"], "fichaje_manual", "time_entries",
+                             datos={"fecha": str(fecha_m), "tipo": tipo_m})
+                    st.success("✅ Fichaje guardado correctamente.")
+                    st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Legal notice
+    # ── Legal notice ───────────────────────────────────────────────────────────
     st.markdown("""
-    <div class="legal-box">
-        📋 <b>RDL 8/2019</b>: Registro de jornada obligatorio. Los datos se conservan
-        <b>4 años</b> y están disponibles para la Inspección de Trabajo (Art. 34.9 ET).
+    <div class="legal-box" style="margin-top:16px">
+        📋 <b>RDL 8/2019</b>: Registro de jornada obligatorio. Datos conservados
+        <b>4 años</b> y disponibles para la Inspección de Trabajo (Art. 34.9 ET).
     </div>
     """, unsafe_allow_html=True)
 
