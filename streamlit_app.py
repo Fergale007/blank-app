@@ -719,6 +719,9 @@ def page_fichaje():
 
 
     # ── Timezone: auto from provincia + manual override ──────────────────────
+    # IMPORTANT: read the widget key 'tz_sel' directly here (Streamlit updates
+    # widget keys in session_state BEFORE the script reruns, so reading it at
+    # the top gives the correct value immediately after the user changes it).
 
     try:
 
@@ -726,11 +729,19 @@ def page_fichaje():
 
         _auto_tz = db.get_user_tz(user) if hasattr(db, 'get_user_tz') else "Europe/Madrid"
 
-        # Manual override stored in session_state
+        _tz_sel_now = st.session_state.get("tz_sel", "Auto")
 
-        _tz_override = st.session_state.get("tz_override", None)
+        if _tz_sel_now == "🌴 Canarias":
 
-        _tz_name = _tz_override if _tz_override else _auto_tz
+            _tz_name = "Atlantic/Canary"
+
+        elif _tz_sel_now == "🇪🇸 Península":
+
+            _tz_name = "Europe/Madrid"
+
+        else:
+
+            _tz_name = _auto_tz
 
         _tz  = ZoneInfo(_tz_name)
 
@@ -930,21 +941,9 @@ def page_fichaje():
 
         _tz_opts = ["Auto", "🌴 Canarias", "🇪🇸 Península"]
 
-        _tz_idx  = 1 if _is_canary and st.session_state.get("tz_override") else 2 if not _is_canary and st.session_state.get("tz_override") else 0
+        _tz_default = 1 if _is_canary and _tz_name != _auto_tz else 2 if not _is_canary and _tz_name != _auto_tz else 0
 
-        _tz_sel  = st.selectbox("Zona horaria", _tz_opts, index=_tz_idx, key="tz_sel", help="Anula la zona horaria automática")
-
-        if _tz_sel == "🌴 Canarias":
-
-            st.session_state["tz_override"] = "Atlantic/Canary"
-
-        elif _tz_sel == "🇪🇸 Península":
-
-            st.session_state["tz_override"] = "Europe/Madrid"
-
-        else:
-
-            st.session_state["tz_override"] = None
+        st.selectbox("Zona horaria", _tz_opts, index=_tz_default, key="tz_sel", help="Auto detecta desde tu perfil. Cambia para sobreescribir.")
 
     with col_obs:
 
