@@ -508,15 +508,31 @@ def render_sidebar():
 
 
 
-        nav_options = ["⏱️ Fichaje", "👤 Mi Perfil", "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}"]
-
-        if is_role("manager", "admin"):
-
-            nav_options += ["👥 Mi Equipo", "✅ Aprobar Solicitudes"]
-
+        # Admin items first so they don't get buried below personal items
         if is_role("admin"):
 
-            nav_options += ["📊 Dashboard Admin", "👤 Usuarios", "📅 Festivos", "📥 Exportaciones", "🔍 Auditoría"]
+            nav_options = [
+                "⏱️ Fichaje", "👤 Mi Perfil",
+                "─── Admin ───",
+                "👤 Usuarios", "📊 Dashboard Admin", "✅ Aprobar Solicitudes",
+                "📅 Festivos", "📥 Exportaciones", "🔍 Auditoría",
+                "─── Personal ───",
+                "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}",
+            ]
+
+        elif is_role("manager"):
+
+            nav_options = [
+                "⏱️ Fichaje", "👤 Mi Perfil",
+                "─── Equipo ───",
+                "👥 Mi Equipo", "✅ Aprobar Solicitudes",
+                "─── Personal ───",
+                "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}",
+            ]
+
+        else:
+
+            nav_options = ["⏱️ Fichaje", "👤 Mi Perfil", "📅 Mi Calendario", "🏖️ Vacaciones", f"🔔 Notificaciones{badge}"]
 
 
 
@@ -554,6 +570,9 @@ def render_sidebar():
 
 
 
+    # Strip emoji prefix and notification badge; separators stay as-is (router will ignore them)
+    if page.startswith("─"):
+        return "Fichaje"  # fallback if separator somehow selected
     return page.split(" ", 1)[1].split("🔴")[0].strip() if " " in page else page
 
 
@@ -2433,298 +2452,240 @@ def page_admin_dashboard():
 
 
 
+# -- Page: Gestion Usuarios ---------------------------------------------------
+
+ROLE_LABEL = {"admin":"Director","manager":"Director de Area","empleado":"Empleado"}
+ROLE_ICON  = {"admin":"crown","manager":"folder","empleado":"person"}
+ROLE_EMOJI = {"admin":"👑","manager":"🗂️","empleado":"👤"}
+CARGO_BY_ROLE = {
+    "admin":   ["Director"],
+    "manager": ["Director de Area"],
+    "empleado":["Comercial","Administrativo","Otro"],
+}
+
+def _mgr_candidates(role, all_users):
+    if role == "admin":   return []
+    if role == "manager": return [u for u in all_users if u["role"] == "admin"]
+    return [u for u in all_users if u["role"] in ("manager","admin")]
+
+def _build_tree(users):
+    rows = []
+    seen = set()
+    def add_subtree(u, lvl):
+        if u["id"] in seen: return
+        seen.add(u["id"])
+        rows.append((lvl, u))
+        for c in users:
+            if c.get("manager_id") == u["id"] and c["id"] not in seen:
+                add_subtree(c, lvl + 1)
+    for u in users:
+        if u["role"] == "admin":
+            add_subtree(u, 0)
+    for u in users:
+        if u["role"] == "manager" and u["id"] not in seen:
+            add_subtree(u, 1)
+    for u in users:
+        if u["id"] not in seen:
+            rows.append((2, u))
+    return rows
+
 def page_usuarios():
+    st.title("Gestion de Usuarios")
+    tab_tree, tab_edit, tab_new = st.tabs(["Organigrama", "Editar usuario", "Nuevo usuario"])
 
-    st.title("👤 Gestión de Usuarios")
+    all_users = db.get_all_users()
+    depts     = db.get_departments()
+    dept_opts = {"Sin departamento": None}
+    dept_opts.update({d["nombre"]: d["id"] for d in depts})
 
-    tab_list, tab_new = st.tabs(["📋 Usuarios", "➕ Nuevo Usuario"])
+    with tab_tree:
+        st.markdown("#### Estructura jerarquica")
+        tree = _build_tree(all_users)
+        if not tree:
+            st.info("No hay usuarios.")
+        else:
+            for lvl, u in tree:
+                pad   = u"\u00a0" * (lvl * 8)
+                icon  = ROLE_EMOJI.get(u["role"], "👤")
+                cargo = u.get("cargo") or ROLE_LABEL.get(u["role"], u["role"])
+                mgr   = u.get("manager_nombre") or "—"
+                dept  = u.get("dept_nombre") or "—"
+                estado= "Activo" if u.get("activo", 1) else "Inactivo"
+                arrows = ["", "L-- ", "    L-- "]
+                arrow  = arrows[min(lvl, 2)]
+                st.markdown(
+                    pad + arrow + icon + " **" + u["nombre"] + " " + u["apellidos"] + "**"
+                    + "  `" + cargo + "`"
+                    + "  Depto: " + dept
+                    + "  Reporta a: " + mgr
+                    + "  " + estado,
+                    unsafe_allow_html=False
+                )
 
-
-
-    with tab_list:
-
-        users = db.get_all_users()
-
-        if not users:
-
+    with tab_edit:
+        if not all_users:
             st.info("Sin usuarios.")
-
             return
 
-
-
-        df = pd.DataFrame(users)
-
-        disp_cols = ["nombre","apellidos","email","role","dept_nombre","manager_nombre",
-
-                     "horas_semanales","dias_vacaciones_anuales","comunidad_autonoma"]
-
-        available = [c for c in disp_cols if c in df.columns]
-
-        st.dataframe(
-
-            df[available].rename(columns={
-
-                "nombre":"Nombre","apellidos":"Apellidos","email":"Email",
-
-                "role":"Rol","dept_nombre":"Depto.","manager_nombre":"Manager",
-
-                "horas_semanales":"H/sem","dias_vacaciones_anuales":"Días vac.",
-
-                "comunidad_autonoma":"Comunidad"
-
-            }),
-
-            use_container_width=True, hide_index=True
-
-        )
-
-
-
-        st.subheader("✏️ Editar usuario")
-
-        opts = {f"{u['nombre']} {u['apellidos']} [{u['role']}]": u["id"] for u in users}
-
-        sel = st.selectbox("Seleccionar", list(opts.keys()))
-
+        opts = {
+            ROLE_EMOJI.get(u["role"],"") + " " + u["nombre"] + " " + u["apellidos"] + " · " + ROLE_LABEL.get(u["role"],u["role"]): u["id"]
+            for u in all_users
+        }
+        sel = st.selectbox("Seleccionar usuario", list(opts.keys()), key="edit_sel")
         uid = opts[sel]
-
-        udata = next((u for u in users if u["id"] == uid), {})
-
-
-
-        managers = [u for u in users if u["role"] in ("manager","admin")]
-
-        mgr_opts = {"Sin manager": None}
-
-        mgr_opts.update({f"{u['nombre']} {u['apellidos']}": u["id"] for u in managers})
-
-
-
-        depts = db.get_departments()
-
-        dept_opts = {"Sin departamento": None}
-
-        dept_opts.update({d["nombre"]: d["id"] for d in depts})
-
-
-
+        ud  = next((u for u in all_users if u["id"] == uid), {})
         roles = ["empleado","manager","admin"]
-
         comunidades = list(COMUNIDADES_MAP.keys())
 
-
-
         with st.form("edit_user"):
-
+            st.markdown("**Datos personales**")
             c1, c2 = st.columns(2)
+            nombre    = c1.text_input("Nombre",    value=ud.get("nombre",""))
+            apellidos = c2.text_input("Apellidos", value=ud.get("apellidos",""))
+            email     = c1.text_input("Email",     value=ud.get("email",""))
+            telefono  = c2.text_input("Telefono",  value=ud.get("telefono",""))
 
-            nombre = c1.text_input("Nombre", value=udata.get("nombre",""))
-
-            apellidos = c2.text_input("Apellidos", value=udata.get("apellidos",""))
-
-            email = c1.text_input("Email", value=udata.get("email",""))
-
-            telefono = c2.text_input("Teléfono", value=udata.get("telefono",""))
-
-            role = c1.selectbox("Rol", roles,
-
-                                index=roles.index(udata.get("role","empleado")) if udata.get("role") in roles else 0)
-
-            comunidad = c2.selectbox("Comunidad autónoma", comunidades,
-
-                                     index=comunidades.index(udata.get("comunidad_autonoma","madrid"))
-
-                                     if udata.get("comunidad_autonoma") in comunidades else 0,
-
-                                     format_func=lambda x: COMUNIDADES_MAP[x])
-
-            horas = c1.number_input("Horas semanales", value=float(udata.get("horas_semanales",40)),
-
-                                    min_value=1.0, max_value=40.0, step=0.5)
-
-            dias_vac = c2.number_input("Días vacaciones anuales", value=int(udata.get("dias_vacaciones_anuales",22)),
-
-                                       min_value=1, max_value=60)
-
-            mgr_sel = c1.selectbox("Manager directo", list(mgr_opts.keys()),
-
-                                   index=0 if not udata.get("manager_id") else
-
-                                   (list(mgr_opts.values()).index(udata["manager_id"])
-
-                                    if udata["manager_id"] in mgr_opts.values() else 0))
-
-            activo = c2.checkbox("Activo", value=bool(udata.get("activo",1)))
-
-            st.markdown("---")
-
-            st.markdown("**📍 Ubicación y zona horaria**")
-
+            st.markdown("**Puesto y jerarquia**")
             c3, c4 = st.columns(2)
+            role = c3.selectbox(
+                "Nivel jerarquico", roles,
+                format_func=lambda x: ROLE_EMOJI[x] + " " + ROLE_LABEL[x],
+                index=roles.index(ud.get("role","empleado")) if ud.get("role") in roles else 0,
+            )
+            cargo_opts = CARGO_BY_ROLE.get(ud.get("role","empleado"), ["Comercial","Administrativo","Otro"])
+            cur_cargo  = ud.get("cargo") or cargo_opts[0]
+            cargo = c4.selectbox(
+                "Cargo", cargo_opts,
+                index=cargo_opts.index(cur_cargo) if cur_cargo in cargo_opts else 0,
+            )
 
-            provincia_list = [""] + PROVINCIAS_ES
+            st.markdown("**Organizacion**")
+            c5, c6 = st.columns(2)
+            dept_keys     = list(dept_opts.keys())
+            cur_dept_name = ud.get("dept_nombre") or "Sin departamento"
+            dept_idx      = dept_keys.index(cur_dept_name) if cur_dept_name in dept_keys else 0
+            dept_sel      = c5.selectbox("Departamento", dept_keys, index=dept_idx)
 
-            cur_prov = udata.get("provincia","") or ""
+            mgr_cands = _mgr_candidates(ud.get("role","empleado"), all_users)
+            mgr_opts_edit = {"Sin responsable": None}
+            mgr_opts_edit.update({
+                ROLE_EMOJI.get(u["role"],"") + " " + u["nombre"] + " " + u["apellidos"] + " · " + ROLE_LABEL.get(u["role"],u["role"]): u["id"]
+                for u in mgr_cands if u["id"] != uid
+            })
+            cur_mgr = ud.get("manager_id")
+            mgr_idx = list(mgr_opts_edit.values()).index(cur_mgr) if cur_mgr in mgr_opts_edit.values() else 0
+            mgr_sel = c6.selectbox("Responsable directo", list(mgr_opts_edit.keys()), index=mgr_idx)
 
-            prov_idx = provincia_list.index(cur_prov) if cur_prov in provincia_list else 0
+            c7, c8 = st.columns(2)
+            horas    = c7.number_input("Horas semanales", value=float(ud.get("horas_semanales",40)), min_value=1.0, max_value=40.0, step=0.5)
+            dias_vac = c8.number_input("Dias vacaciones/anio", value=int(ud.get("dias_vacaciones_anuales",22)), min_value=1, max_value=60)
+            comunidad = c7.selectbox(
+                "Comunidad autonoma", comunidades,
+                index=comunidades.index(ud.get("comunidad_autonoma","madrid")) if ud.get("comunidad_autonoma") in comunidades else 0,
+                format_func=lambda x: COMUNIDADES_MAP[x],
+            )
+            activo = c8.checkbox("Activo", value=bool(ud.get("activo",1)))
 
-            provincia = c3.selectbox("Provincia", provincia_list, index=prov_idx,
+            st.markdown("**Ubicacion**")
+            c9, c10 = st.columns(2)
+            prov_list = [""] + PROVINCIAS_ES
+            cur_prov  = ud.get("provincia","") or ""
+            provincia = c9.selectbox("Provincia", prov_list,
+                                     index=prov_list.index(cur_prov) if cur_prov in prov_list else 0)
+            localidad = c10.text_input("Localidad", value=ud.get("localidad","") or "")
+            comunidad_final = PROVINCIA_COMUNIDAD.get(provincia, comunidad) if provincia else comunidad
+            new_pw = st.text_input("Nueva contrasena (vacio = sin cambios)", type="password")
 
-                                      help="Determina la zona horaria y festivos autonómicos automáticamente")
-
-            localidad = c4.text_input("Localidad / municipio", value=udata.get("localidad","") or "",
-
-                                       help="Para festivos locales")
-
-            # Auto-update comunidad from provincia
-
-            if provincia and provincia in PROVINCIA_COMUNIDAD:
-
-                comunidad_auto = PROVINCIA_COMUNIDAD[provincia]
-
-            else:
-
-                comunidad_auto = comunidad
-
-            new_pw = st.text_input("Nueva contraseña (dejar vacío para no cambiar)", type="password")
-
-
-
-            if st.form_submit_button("💾 Guardar"):
-
-                kwargs = dict(nombre=nombre, apellidos=apellidos, email=email,
-
-                              telefono=telefono, role=role, comunidad_autonoma=comunidad_auto,
-
-                              horas_semanales=horas, dias_vacaciones_anuales=dias_vac,
-
-                              manager_id=mgr_opts[mgr_sel], activo=int(activo),
-
-                              provincia=provincia, localidad=localidad)
-
+            if st.form_submit_button("Guardar cambios", type="primary"):
+                kw = dict(
+                    nombre=nombre, apellidos=apellidos, email=email, telefono=telefono,
+                    role=role, cargo=cargo,
+                    department_id=dept_opts[dept_sel],
+                    manager_id=mgr_opts_edit[mgr_sel],
+                    horas_semanales=horas, dias_vacaciones_anuales=dias_vac,
+                    comunidad_autonoma=comunidad_final, activo=int(activo),
+                    provincia=provincia, localidad=localidad,
+                )
                 if new_pw:
-
-                    kwargs["password"] = new_pw
-
-                db.update_user(uid, **kwargs)
-
+                    kw["password"] = new_pw
+                db.update_user(uid, **kw)
                 db.audit(current_user()["id"], "editar_usuario", "users", uid)
-
-                st.success("✅ Usuario actualizado."); st.rerun()
-
-
+                st.success("Usuario actualizado.")
+                st.rerun()
 
     with tab_new:
-
-        st.subheader("Crear nuevo usuario")
-
-        managers = [u for u in db.get_all_users(activos_only=True) if u["role"] in ("manager","admin")]
-
-        depts = db.get_departments()
-
-        mgr_opts = {"Sin manager": None}
-
-        mgr_opts.update({f"{u['nombre']} {u['apellidos']}": u["id"] for u in managers})
-
-        dept_opts = {"Sin departamento": None}
-
-        dept_opts.update({d["nombre"]: d["id"] for d in depts})
-
-
-
         with st.form("new_user"):
-
+            st.markdown("**Datos personales**")
             c1, c2 = st.columns(2)
-
-            username = c1.text_input("Usuario (login) *")
-
-            password = c2.text_input("Contraseña *", type="password")
-
-            nombre = c1.text_input("Nombre *")
-
+            username  = c1.text_input("Usuario (login) *")
+            password  = c2.text_input("Contrasena *", type="password")
+            nombre    = c1.text_input("Nombre *")
             apellidos = c2.text_input("Apellidos *")
+            email     = c1.text_input("Email")
+            telefono  = c2.text_input("Telefono")
 
-            email = c1.text_input("Email")
-
-            role = c2.selectbox("Rol", ["empleado","manager","admin"])
-
-            comunidad = c1.selectbox("Comunidad autónoma", list(COMUNIDADES_MAP.keys()),
-
-                                     format_func=lambda x: COMUNIDADES_MAP[x])
-
-            horas = c2.number_input("Horas semanales", value=40.0, min_value=1.0, max_value=40.0, step=0.5)
-
-            dias_vac = c1.number_input("Días vacaciones anuales", value=22, min_value=1, max_value=60)
-
-            mgr_sel = c2.selectbox("Manager directo", list(mgr_opts.keys()))
-
-            st.markdown("---")
-
+            st.markdown("**Puesto y jerarquia**")
             c3, c4 = st.columns(2)
+            role_n  = c3.selectbox(
+                "Nivel jerarquico", ["empleado","manager","admin"],
+                format_func=lambda x: ROLE_EMOJI[x] + " " + ROLE_LABEL[x],
+                key="new_role",
+            )
+            cargo_n = c4.selectbox(
+                "Cargo", ["Comercial","Administrativo","Director de Area","Director","Otro"],
+                key="new_cargo",
+            )
 
-            provincia_new = c3.selectbox("Provincia", [""] + PROVINCIAS_ES, key="new_prov",
+            st.markdown("**Organizacion**")
+            c5, c6 = st.columns(2)
+            dept_n = c5.selectbox("Departamento", list(dept_opts.keys()), key="new_dept")
+            all_mgr_cands = [u for u in all_users if u["role"] in ("manager","admin")]
+            mgr_opts_new = {"Sin responsable": None}
+            mgr_opts_new.update({
+                ROLE_EMOJI.get(u["role"],"") + " " + u["nombre"] + " " + u["apellidos"] + " · " + ROLE_LABEL.get(u["role"],u["role"]): u["id"]
+                for u in all_mgr_cands
+            })
+            mgr_n = c6.selectbox("Responsable directo", list(mgr_opts_new.keys()), key="new_mgr")
 
-                                          help="Determina zona horaria y festivos")
+            c7, c8 = st.columns(2)
+            horas_n    = c7.number_input("Horas semanales", value=40.0, min_value=1.0, max_value=40.0, step=0.5, key="new_h")
+            dias_vac_n = c8.number_input("Dias vacaciones/anio", value=22, min_value=1, max_value=60, key="new_dv")
+            comunidad_n = c7.selectbox("Comunidad autonoma", list(COMUNIDADES_MAP.keys()),
+                                       format_func=lambda x: COMUNIDADES_MAP[x], key="new_com")
 
-            localidad_new = c4.text_input("Localidad / municipio", key="new_loc")
+            st.markdown("**Ubicacion**")
+            c9, c10 = st.columns(2)
+            prov_n = c9.selectbox("Provincia", [""]+PROVINCIAS_ES, key="new_prov")
+            loc_n  = c10.text_input("Localidad", key="new_loc")
 
-
-
-            if st.form_submit_button("✅ Crear usuario", type="primary"):
-
+            if st.form_submit_button("Crear usuario", type="primary"):
                 if not username or not password or not nombre or not apellidos:
-
-                    st.error("Campos obligatorios: usuario, contraseña, nombre, apellidos.")
-
+                    st.error("Campos obligatorios: usuario, contrasena, nombre, apellidos.")
                 else:
-
                     try:
+                        com_final = PROVINCIA_COMUNIDAD.get(prov_n, comunidad_n) if prov_n else comunidad_n
+                        uid_new = db.create_user(
+                            username, password, nombre, apellidos, email,
+                            role_n, dept_opts[dept_n], mgr_opts_new[mgr_n], com_final, horas_n, dias_vac_n
+                        )
+                        db.update_user(uid_new, cargo=cargo_n, provincia=prov_n, localidad=loc_n, telefono=telefono)
+                        db.audit(current_user()["id"], "crear_usuario", "users", uid_new)
+                        st.success("Usuario " + username + " creado.")
+                        st.rerun()
+                    except Exception as ex:
+                        st.error("Error: " + str(ex))
 
-                        comunidad_final = PROVINCIA_COMUNIDAD.get(provincia_new, comunidad) if provincia_new else comunidad
-
-                        uid = db.create_user(username, password, nombre, apellidos, email,
-
-                                             role, dept_opts.get(list(dept_opts.keys())[0]),
-
-                                             mgr_opts[mgr_sel], comunidad_final, horas, dias_vac)
-
-                        db.update_user(uid, provincia=provincia_new, localidad=localidad_new)
-
-                        db.audit(current_user()["id"], "crear_usuario", "users", uid)
-
-                        st.success(f"✅ Usuario {username} creado."); st.rerun()
-
-                    except Exception as e:
-
-                        st.error(f"Error: {e}")
-
-
-
-        # Departments
-
+        st.markdown("---")
         st.subheader("Departamentos")
-
         for d in db.get_departments():
-
-            st.write(f"• {d['nombre']}")
-
+            st.write("- " + d["nombre"])
         with st.form("new_dept"):
-
             dept_nombre = st.text_input("Nuevo departamento")
-
-            if st.form_submit_button("Añadir"):
-
+            if st.form_submit_button("Anadir"):
                 if dept_nombre:
-
                     db.create_department(dept_nombre)
-
-                    st.success("Departamento creado."); st.rerun()
-
-
-
-# ── Page: Festivos ────────────────────────────────────────────────────────────
-
+                    st.success("Departamento creado.")
+                    st.rerun()
 
 
 def page_festivos():
