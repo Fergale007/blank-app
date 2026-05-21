@@ -271,11 +271,12 @@ def page_fichaje():
     worked = db.calc_worked_hours(entries)
 
     # Status bar
+    last_hora = entries[-1]['hora'][:5] if entries else "--:--"
     status_text = {
         None: ("dot-libre", "Sin fichar hoy"),
-        "entrada": ("dot-trabajando", f"Trabajando desde {entries[-1]['hora'][:5]}"),
-        "pausa": ("dot-pausado", f"En pausa desde {entries[-1]['hora'][:5]}"),
-        "fin_pausa": ("dot-trabajando", f"Trabajando (tras pausa) desde {entries[-1]['hora'][:5]}"),
+        "entrada": ("dot-trabajando", f"Trabajando desde {last_hora}"),
+        "pausa": ("dot-pausado", f"En pausa desde {last_hora}"),
+        "fin_pausa": ("dot-trabajando", f"Trabajando (tras pausa) desde {last_hora}"),
         "salida": ("dot-completo", f"Jornada finalizada · {fmt_h(worked)} trabajadas"),
     }.get(state, ("dot-libre", "—"))
     dot_cls, status_msg = status_text
