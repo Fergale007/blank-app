@@ -1,4 +1,4 @@
-"""Ficha · Control Horario SaaS — RDL 8/2019 · ET Arts. 34/35/38 · RGPD"""
+"""Ficha · Control Horario SaaS — RDL 8/2019 · ET Arts. 34/35/38 · RGPD — build:20260521"""
 import streamlit as st
 import pandas as pd
 import plotly.express as px
