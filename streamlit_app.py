@@ -259,14 +259,15 @@ def render_sidebar():
 # ── Page: Fichaje ─────────────────────────────────────────────────────────────
 
 def page_fichaje():
-    from zoneinfo import ZoneInfo
+    try:
+        from zoneinfo import ZoneInfo
+        _tz = ZoneInfo("Atlantic/Canary" if current_user().get("comunidad_autonoma") == "canarias"
+                       else "Europe/Madrid")
+        _now = datetime.now(_tz)
+    except Exception:
+        _now = datetime.now()
 
     user = current_user()
-
-    # ── Timezone-aware time (Canarias = Atlantic/Canary, resto = Europe/Madrid) ─
-    _tz = ZoneInfo("Atlantic/Canary" if user.get("comunidad_autonoma") == "canarias"
-                   else "Europe/Madrid")
-    _now = datetime.now(_tz)
     hoy  = _now.date()
     ahora = _now.strftime("%H:%M")
     zona_label = "🌴 Canarias" if user.get("comunidad_autonoma") == "canarias" else "🇪🇸 Península"
@@ -355,7 +356,7 @@ def page_fichaje():
             key="tipo_jornada",
         )
     with col_h:
-        hora_manual_cb = st.toggle("⏱ Hora manual", key="hora_manual_cb")
+        hora_manual_cb = st.checkbox("⏱ Hora manual", key="hora_manual_cb")
     with col_obs:
         obs = st.text_input("Observación (opcional)",
                             placeholder="Ej: Reunión con cliente…",
