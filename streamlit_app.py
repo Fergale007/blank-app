@@ -574,22 +574,12 @@ def render_calendar(user_id, año, mes, comunidad="madrid"):
         row += "</tr>"
         rows += row
 
-    legend = """
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:.78rem">
-        <span><span style="background:#d1fae5;padding:2px 8px;border-radius:4px">Verde</span> Completo</span>
-        <span><span style="background:#fef9c3;padding:2px 8px;border-radius:4px">Amarillo</span> Incidencia</span>
-        <span><span style="background:#fee2e2;padding:2px 8px;border-radius:4px">Rojo</span> Sin fichar</span>
-        <span><span style="background:#e0e7ff;padding:2px 8px;border-radius:4px">Azul</span> Festivo</span>
-        <span><span style="background:#fdf4ff;padding:2px 8px;border-radius:4px">Violeta</span> Vacaciones</span>
-    </div>
-    """
     return f"""
     <div class="cal-wrapper">
     <table class="cal-table">
     <thead><tr>{headers}</tr></thead>
     <tbody>{rows}</tbody>
     </table>
-    {legend}
     </div>
     """
 
@@ -631,6 +621,13 @@ def page_calendario():
     cal_html = render_calendar(user["id"], año, mes, comunidad)
 
     st.markdown(f'<div class="card">{cal_html}</div>', unsafe_allow_html=True)
+
+    # Leyenda separada (Streamlit 1.36+ filtra HTML tras </table>)
+    st.markdown(
+        "🟩 Completo &nbsp; 🟨 Incidencia &nbsp; 🟥 Sin fichar "
+        "&nbsp; 🟦 Festivo &nbsp; 🟪 Vacaciones",
+        unsafe_allow_html=True,
+    )
 
     # Day selector for details
     st.subheader("Detalle del día")
