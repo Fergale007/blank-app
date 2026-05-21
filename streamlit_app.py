@@ -2,6 +2,21 @@
 
 import streamlit as st
 
+import re as _re
+
+# ── HTML blank-line fix ───────────────────────────────────────────────────────
+# The file uses double-spacing (blank line after every code line).
+# Inside f-string HTML blocks this causes CommonMark to terminate HTML blocks
+# at the first blank line, showing the rest as raw text.
+# This patch strips blank lines from HTML content before Markdown processes it.
+_st_markdown_orig = st.markdown
+def _st_markdown_fixed(body, **kwargs):
+    if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
+        body = _re.sub(r'\n[ \t]*\n', '\n', body)
+    return _st_markdown_orig(body, **kwargs)
+st.markdown = _st_markdown_fixed
+# ─────────────────────────────────────────────────────────────────────────────
+
 import pandas as pd
 
 import plotly.express as px
