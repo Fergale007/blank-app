@@ -405,65 +405,53 @@ def page_login():
 
     st.markdown(STYLES, unsafe_allow_html=True)
 
-    st.markdown("""
+    # Use columns to center the login card
 
-    <div class="login-card">
+    _, col, _ = st.columns([1, 1.1, 1])
 
-        <div style="text-align:center;margin-bottom:24px">
+    with col:
 
-            <div style="font-size:2.5rem">⏱️</div>
+        # Self-contained header block (all divs closed)
 
-            <h2 style="margin:8px 0 4px;color:#1e1f2e;font-weight:700">Ficha</h2>
+        st.markdown("""
+<div style="text-align:center;padding:28px 24px 8px;background:white;border-radius:16px 16px 0 0;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+  <div style="font-size:2.8rem;margin-bottom:4px">&#9201;</div>
+  <h2 style="margin:6px 0 2px;color:#1e1f2e;font-weight:700;font-size:1.7rem">Ficha</h2>
+  <p style="color:#64748b;font-size:.9rem;margin:0 0 8px">Control Horario &middot; RDL 8/2019</p>
+</div>
+""", unsafe_allow_html=True)
 
-            <p style="color:#64748b;font-size:.9rem;margin:0">Control Horario · RDL 8/2019</p>
+        with st.form("login_form"):
 
-        </div>
+            username = st.text_input("Usuario", placeholder="usuario")
 
-    """, unsafe_allow_html=True)
+            password = st.text_input("Contrasena", type="password", placeholder="...")
 
+            submitted = st.form_submit_button("Entrar", use_container_width=True, type="primary")
 
+        # Self-contained footer block
 
-    with st.form("login_form"):
+        st.markdown("""
+<div style="padding:10px 14px 14px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:.8rem;color:#64748b">
+  <b>Demo:</b> admin / Admin1234! &nbsp;&middot;&nbsp; manager1 / Manager123! &nbsp;&middot;&nbsp; empleado1 / Empleado123!
+</div>
+""", unsafe_allow_html=True)
 
-        username = st.text_input("Usuario", placeholder="usuario")
+        if submitted:
 
-        password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            user = db.authenticate(username.strip(), password)
 
-        submitted = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+            if user:
 
+                st.session_state["user"] = user
 
+                db.audit(user["id"], "login", ip="0.0.0.0")
 
-    st.markdown("""
+                st.rerun()
 
-        <div style="margin-top:20px;padding:12px;background:#f8fafc;border-radius:8px;font-size:.82rem;color:#64748b">
+            else:
 
-            <b>Credenciales demo:</b><br>
-
-            admin / Admin1234! &nbsp;·&nbsp; manager1 / Manager123! &nbsp;·&nbsp; empleado1 / Empleado123!
-
-        </div>
-
-    </div>
-
-    """, unsafe_allow_html=True)
-
-
-
-    if submitted:
-
-        user = db.authenticate(username.strip(), password)
-
-        if user:
-
-            st.session_state["user"] = user
-
-            db.audit(user["id"], "login", ip="0.0.0.0")
-
-            st.rerun()
-
-        else:
-
-            st.error("Usuario o contraseña incorrectos.")
+                st.error("Usuario o contrasena incorrectos.")
 
 
 
