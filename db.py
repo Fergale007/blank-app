@@ -280,13 +280,13 @@ def create_department(nombre: str):
 # ── Time entries ──────────────────────────────────────────────────────────────
 
 def add_entry(user_id, fecha, tipo, hora, ip="", observaciones="", is_manual=False, created_by=None):
-    c = _conn()
-    c.execute("""INSERT INTO time_entries (user_id,fecha,tipo,hora,ip,observaciones,is_manual,created_by)
+    conn = _conn()
+    cur = conn.execute("""INSERT INTO time_entries (user_id,fecha,tipo,hora,ip,observaciones,is_manual,created_by)
                  VALUES (?,?,?,?,?,?,?,?)""",
               (user_id, str(fecha), tipo, hora, ip, observaciones, int(is_manual), created_by))
-    eid = c.lastrowid
-    c.commit()
-    c.close()
+    eid = cur.lastrowid
+    conn.commit()
+    conn.close()
     return eid
 
 def get_day_entries(user_id, fecha):
