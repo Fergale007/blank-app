@@ -534,8 +534,8 @@ def init_db():
 
 
 
-    # Migration: add provincia and localidad if not present
-    for col, defval in [("provincia","''"), ("localidad","''")]:
+    # Migration: add columns if not present
+    for col, defval in [("provincia","''"), ("localidad","''"), ("cargo","''")]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {defval}")
         except Exception:
