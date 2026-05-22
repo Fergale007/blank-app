@@ -45,6 +45,39 @@ if not _PG_URL:
     _PG_URL = _os.environ.get("DATABASE_URL", "")
 _USE_PG = bool(_PG_URL)
 
+# ── Persistent per-thread PG connection (avoids reconnect on every query) ─────
+import threading as _threading
+_pg_local = _threading.local()
+
+def _make_raw_pg():
+    import psycopg2
+    from urllib.parse import urlparse, unquote
+    _p = urlparse(_PG_URL)
+    return psycopg2.connect(
+        host=_p.hostname,
+        port=_p.port or 5432,
+        dbname=(_p.path or "/postgres").lstrip("/"),
+        user=unquote(_p.username or "postgres"),
+        password=unquote(_p.password or ""),
+        sslmode="require",
+        connect_timeout=15,
+    )
+
+def _get_raw_pg():
+    cn = getattr(_pg_local, "cn", None)
+    if cn is None or cn.closed:
+        _pg_local.cn = _make_raw_pg()
+        return _pg_local.cn
+    try:
+        cn.cursor().execute("SELECT 1")
+        return cn
+    except Exception:
+        try: cn.close()
+        except Exception: pass
+        _pg_local.cn = _make_raw_pg()
+        return _pg_local.cn
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 class _PGConn:
     """
@@ -52,25 +85,8 @@ class _PGConn:
     Handles: ?->%s, INSERT OR IGNORE, datetime(), AUTOINCREMENT, lastrowid via RETURNING.
     """
     def __init__(self):
-        import psycopg2
         import psycopg2.extras
-        from urllib.parse import urlparse, unquote
-        _p = urlparse(_PG_URL)
-        _host  = _p.hostname or ""
-        _port  = _p.port or 5432
-        _db    = (_p.path or "/postgres").lstrip("/")
-        _user  = unquote(_p.username or "postgres")
-        _pwd   = unquote(_p.password or "")
-        try:
-            self._cn = psycopg2.connect(
-                host=_host, port=_port, dbname=_db,
-                user=_user, password=_pwd,
-                sslmode="require", connect_timeout=10,
-            )
-        except Exception as _e:
-            raise RuntimeError(
-                f"PG_FAIL host={_host} port={_port} user={_user!r} db={_db!r} err={_e}"
-            ) from None
+        self._cn  = _get_raw_pg()
         self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.lastrowid = None
 
@@ -131,8 +147,8 @@ class _PGConn:
         try:
             self._cn.commit()
         except Exception:
-            pass
-        self._cn.close()
+            try: self._cn.rollback()
+            except Exception: pass
 
     def __enter__(self):
         return self
