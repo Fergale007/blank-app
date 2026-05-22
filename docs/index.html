@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ODK Ficha</title>
+
+  <!-- iOS home screen icon -->
+  <link rel="apple-touch-icon" sizes="512x512" href="icon.png">
+  <link rel="apple-touch-icon-precomposed" sizes="512x512" href="icon.png">
+
+  <!-- PWA / home screen behaviour -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="ODK Ficha">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#7C3AED">
+  <meta name="application-name" content="ODK Ficha">
+
+  <!-- Android PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#0a0812; }
+    iframe { position:fixed; top:0; left:0; width:100%; height:100%;
+              border:none; display:block; }
+  </style>
+</head>
+<body>
+  <iframe src="https://blank-app-fergale007.streamlit.app"
+          allow="camera; microphone; geolocation; clipboard-write"
+          loading="eager"
+          title="ODK Ficha Control Horario">
+  </iframe>
+</body>
+</html>
