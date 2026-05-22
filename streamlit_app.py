@@ -4,7 +4,16 @@ import streamlit as st
 
 import re as _re
 import textwrap as _textwrap
-from PIL import Image as _PILImage
+import os as _os
+
+# ── App icon — load PNG relative to this file, fallback to emoji ──────────────
+try:
+    from PIL import Image as _PILImage
+    _icon_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "icon.png")
+    _APP_ICON = _PILImage.open(_icon_path)
+except Exception:
+    _APP_ICON = "🍸"
+# ─────────────────────────────────────────────────────────────────────────────
 
 # ── HTML render fix (definitive) ──────────────────────────────────────────────
 # Two CommonMark bugs killed HTML rendering:
@@ -63,7 +72,7 @@ st.set_page_config(
 
     page_title="Ficha · Control Horario",
 
-    page_icon=_PILImage.open("icon.png"),
+    page_icon=_APP_ICON,
 
     layout="wide",
 
