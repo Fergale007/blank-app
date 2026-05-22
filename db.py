@@ -767,84 +767,93 @@ def _seed_holidays(c):
 
 
 
-def _seed_users(c):
-
-
-
-    seed = [
-
-
-
-        ("admin",     hash_pw("Admin1234!"),    "Administrador", "Sistema",  "admin@empresa.com",   "admin",    None, None),
-
-
-
-        ("manager1",  hash_pw("Manager123!"),   "María",         "González", "maria@empresa.com",   "manager",  None, None),
-
-
-
-        ("empleado1", hash_pw("Empleado123!"),  "Juan",          "Pérez",    "juan@empresa.com",    "empleado", None, None),
-
-
-
-        ("empleado2", hash_pw("Empleado123!"),  "Ana",           "Martínez", "ana@empresa.com",     "empleado", None, None),
-
-
-
-    ]
-
-
-
-    for u in seed:
-
-
-
+def _seed_departments(c):
+    depts = ["Direccion General", "Comercial", "Administracion"]
+    for d in depts:
         try:
-
-
-
-            c.execute("INSERT OR IGNORE INTO users (username,password_hash,nombre,apellidos,email,role,department_id,manager_id) VALUES (?,?,?,?,?,?,?,?)", u)
-
-
-
+            c.execute("INSERT OR IGNORE INTO departments (nombre) VALUES (?)", (d,))
         except Exception:
-
-
-
             pass
 
+def _seed_users(c):
+    # Always seed departments first
+    _seed_departments(c)
+    c.commit()
 
+    # Helper: get dept id by name
+    def dept_id(name):
+        row = c.execute("SELECT id FROM departments WHERE nombre=?", (name,)).fetchone()
+        return row[0] if row else None
 
-    # Assign employees to manager (id=2) after insert
+    # Helper: get user id by username
+    def uid(uname):
+        row = c.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone()
+        return row[0] if row else None
 
+    # --------------------------------------------------------------------------
+    # LEVEL 0 — Director General (admin)
+    # Password inicial: Temporal1234!  (cambiar en primer login)
+    # --------------------------------------------------------------------------
+    admins = [
+        # (username, pw, nombre, apellidos, email, role, dept, cargo, provincia, comunidad)
+        ("admin",      "Admin1234!",    "Admin",      "Sistema",           "admin@empresa.com",              "admin", "Direccion General", "Director General",  "",            "madrid"),
+        ("fmartinez",  "Temporal1234!", "Fernando",   "Martinez Robles",   "f.martinez@bartendercocktail.es","admin", "Direccion General", "Director General",  "A Coruna",    "galicia"),
+    ]
+    for u in admins:
+        username, pw, nombre, apellidos, email, role, dept, cargo, provincia, com = u
+        try:
+            c.execute(
+                "INSERT OR IGNORE INTO users (username,password_hash,nombre,apellidos,email,role,department_id,comunidad_autonoma,cargo,provincia,activo) VALUES (?,?,?,?,?,?,?,?,?,?,1)",
+                (username, hash_pw(pw), nombre, apellidos, email, role, dept_id(dept), com, cargo, provincia)
+            )
+        except Exception:
+            pass
 
+    # --------------------------------------------------------------------------
+    # LEVEL 1 — Directores de Area (manager)
+    # --------------------------------------------------------------------------
+    mgr_dir = uid("fmartinez") or uid("admin")
 
-    try:
+    managers = [
+        # (username, pw, nombre, apellidos, email, dept, cargo, provincia, comunidad)
+        ("chiki",      "Temporal1234!", "Chiki",     "",                   "chiki@caparta.com",                          "Comercial",       "Director de Area", "Formentera",           "baleares"),
+        ("triera",     "Temporal1234!", "Antonio",   "Riera",              "tonirierabartendercocktail@gmail.com",        "Comercial",       "Director de Area", "Albacete",             "castilla_la_mancha"),
+        ("farqueros",  "Temporal1234!", "Fernando",  "Arqueros Figueiredo","f.arqueros@bartendercocktail.es",             "Comercial",       "Director de Area", "Las Palmas",           "canarias"),
+        ("edelgado",   "Temporal1234!", "Eduardo",   "Delgado",            "e.delgado@bartendercocktail.es",              "Comercial",       "Director de Area", "Palencia",             "castilla_leon"),
+        ("susana",     "Temporal1234!", "Susana",    "",                   "administracion@bartendercocktail.es",         "Administracion",  "Director de Area", "",                    "madrid"),
+    ]
+    for u in managers:
+        username, pw, nombre, apellidos, email, dept, cargo, provincia, com = u
+        try:
+            c.execute(
+                "INSERT OR IGNORE INTO users (username,password_hash,nombre,apellidos,email,role,department_id,manager_id,comunidad_autonoma,cargo,provincia,activo) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)",
+                (username, hash_pw(pw), nombre, apellidos, email, "manager", dept_id(dept), mgr_dir, com, cargo, provincia)
+            )
+        except Exception:
+            pass
 
-
-
-        mgr = c.execute("SELECT id FROM users WHERE username='manager1'").fetchone()
-
-
-
-        if mgr:
-
-
-
-            c.execute("UPDATE users SET manager_id=? WHERE username IN ('empleado1','empleado2')", (mgr[0],))
-
-
-
-    except Exception:
-
-
-
-        pass
-
-
-
-
-
+    # --------------------------------------------------------------------------
+    # LEVEL 2 — Empleados (Comerciales y Administrativos)
+    # --------------------------------------------------------------------------
+    empleados = [
+        # (username, pw, nombre, apellidos, email, dept, cargo, manager_username)
+        ("menriquez",  "Temporal1234!", "Manuel",   "Enriquez",  "m.enriquez@bartendercocktail.es",   "Comercial",      "Comercial",                "fmartinez"),
+        ("arosa",      "Temporal1234!", "Antonio",  "Rosa",      "a.rosa@bartendercocktail.es",        "Comercial",      "Comercial",                "fmartinez"),
+        ("cferreira",  "Temporal1234!", "Carlos",   "Ferreira",  "c.ferreira@bartendercocktail.es",    "Comercial",      "Comercial",                "triera"),
+        ("damian",     "Temporal1234!", "Damian",   "",          "damianodk2025@gmail.com",             "Comercial",      "Comercial",                "chiki"),
+        ("vbonilla",   "Temporal1234!", "Vicente",  "Bonilla",   "bonillapuertas@gmail.com",            "Comercial",      "Comercial",                "fmartinez"),
+        ("pablo",      "Temporal1234!", "Pablo",    "",          "info@bartendercocktail.es",           "Administracion", "Responsable Administracion","susana"),
+    ]
+    for u in empleados:
+        username, pw, nombre, apellidos, email, dept, cargo, mgr_uname = u
+        mgr = uid(mgr_uname) or mgr_dir
+        try:
+            c.execute(
+                "INSERT OR IGNORE INTO users (username,password_hash,nombre,apellidos,email,role,department_id,manager_id,cargo,activo) VALUES (?,?,?,?,?,?,?,?,?,1)",
+                (username, hash_pw(pw), nombre, apellidos, email, "empleado", dept_id(dept), mgr, cargo)
+            )
+        except Exception:
+            pass
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
