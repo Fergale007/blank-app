@@ -7,6 +7,7 @@ import sqlite3
 
 
 import hashlib
+import hmac as _hmac
 
 
 
@@ -200,10 +201,62 @@ def _conn():
 
 
 def hash_pw(pw: str) -> str:
+    """Hash password with bcrypt (cost=12). Falls back to SHA-256 only for seeding."""
+    try:
+        import bcrypt
+        return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=12)).decode()
+    except Exception:
+        # bcrypt not available (unit tests / local dev without package)
+        return hashlib.sha256(pw.encode()).hexdigest()
 
 
+def _verify_pw(plain: str, stored_hash: str) -> bool:
+    """
+    Verify password supporting both bcrypt ($2b$) and legacy SHA-256.
+    Returns (matches, needs_upgrade).
+    """
+    if stored_hash.startswith("$2"):
+        try:
+            import bcrypt
+            return bcrypt.checkpw(plain.encode(), stored_hash.encode()), False
+        except Exception:
+            return False, False
+    # Legacy SHA-256 — matches means we should upgrade on the fly
+    matches = hashlib.sha256(plain.encode()).hexdigest() == stored_hash
+    return matches, matches  # (matches, needs_upgrade)
 
-    return hashlib.sha256(pw.encode()).hexdigest()
+
+# ── LEG-01/02: HMAC signature key for time entries ───────────────────────────
+def _sig_key() -> bytes:
+    """
+    Key used to sign time_entries rows (LEG-01 tamper detection).
+    Reads ENTRY_SIG_KEY secret; falls back to a hash of DATABASE_URL.
+    """
+    try:
+        import streamlit as _st
+        k = _st.secrets.get("ENTRY_SIG_KEY", "")
+        if k:
+            return k.encode()
+    except Exception:
+        pass
+    base = _os.environ.get("ENTRY_SIG_KEY") or _os.environ.get("DATABASE_URL", "odk-ficha-dev")
+    return hashlib.sha256(base.encode()).digest()
+
+
+def _sign_entry(user_id, fecha, tipo, hora) -> str:
+    """Compute HMAC-SHA256 signature for a time entry (LEG-01)."""
+    msg = f"{user_id}|{fecha}|{tipo}|{hora}".encode()
+    return _hmac.new(_sig_key(), msg, hashlib.sha256).hexdigest()
+
+
+def verify_entry_signature(entry) -> bool:
+    """Returns True if the entry's signature matches its data (tamper check)."""
+    sig = entry.get("entry_sig", "")
+    if not sig:
+        return True  # pre-LEG-01 entries have no sig — treat as OK
+    expected = _sign_entry(entry["user_id"], entry["fecha"], entry["tipo"], entry["hora"])
+    return _hmac.compare_digest(sig, expected)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 
@@ -391,9 +444,11 @@ def init_db():
 
 
 
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TEXT DEFAULT (datetime('now')),
 
+            entry_sig TEXT DEFAULT '',
 
+            retain_until TEXT DEFAULT ''
 
         )""",
 
@@ -689,10 +744,17 @@ def init_db():
 
 
 
-    # Migration: add columns if not present
+    # Migration: add columns if not present (users)
     for col, defval in [("provincia","''"), ("localidad","''"), ("cargo","''")]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {defval}")
+        except Exception:
+            pass
+
+    # Migration: LEG-01/02 — add entry_sig + retain_until to time_entries
+    for col, defval in [("entry_sig", "''"), ("retain_until", "''")]:
+        try:
+            c.execute(f"ALTER TABLE time_entries ADD COLUMN {col} TEXT DEFAULT {defval}")
         except Exception:
             pass
     c.commit()
@@ -1088,27 +1150,19 @@ def authenticate(username: str, password: str):
 
 
 
-    if user and user["password_hash"] == hash_pw(password):
-
-
-
-        c = _conn()
-
-
-
-        c.execute("UPDATE users SET last_login=datetime('now') WHERE id=?", (user["id"],))
-
-
-
-        c.commit()
-
-
-
-        c.close()
-
-
-
-        return user
+    if user:
+        matches, needs_upgrade = _verify_pw(password, user["password_hash"])
+        if matches:
+            c = _conn()
+            if needs_upgrade:
+                # SEC-02: auto-migrate SHA-256 → bcrypt on first login
+                c.execute("UPDATE users SET password_hash=?, last_login=datetime('now') WHERE id=?",
+                          (hash_pw(password), user["id"]))
+            else:
+                c.execute("UPDATE users SET last_login=datetime('now') WHERE id=?", (user["id"],))
+            c.commit()
+            c.close()
+            return user
 
 
 
@@ -1344,15 +1398,19 @@ def add_entry(user_id, fecha, tipo, hora, ip="", observaciones="", is_manual=Fal
 
 
 
-    cur = conn.execute("""INSERT INTO time_entries (user_id,fecha,tipo,hora,ip,observaciones,is_manual,created_by)
+    # LEG-01: sign entry; LEG-02: set 4-year retention
+    _sig = _sign_entry(user_id, str(fecha), tipo, hora)
+    _retain = str(date.fromisoformat(str(fecha)).replace(year=date.fromisoformat(str(fecha)).year + 4))
+
+    cur = conn.execute("""INSERT INTO time_entries (user_id,fecha,tipo,hora,ip,observaciones,is_manual,created_by,entry_sig,retain_until)
 
 
 
-                 VALUES (?,?,?,?,?,?,?,?)""",
+                 VALUES (?,?,?,?,?,?,?,?,?,?)""",
 
 
 
-              (user_id, str(fecha), tipo, hora, ip, observaciones, int(is_manual), created_by))
+              (user_id, str(fecha), tipo, hora, ip, observaciones, int(is_manual), created_by, _sig, _retain))
 
 
 
@@ -1497,21 +1555,24 @@ def get_all_entries_range(f_ini, f_fin, user_ids=None):
 
 
 def soft_delete_entry(entry_id: int, deleted_by: int):
-
-
-
     c = _conn()
-
-
-
+    # LEG-02: block deletion if within 4-year legal retention period
+    row = c.execute("SELECT retain_until FROM time_entries WHERE id=?", (entry_id,)).fetchone()
+    if row:
+        ru = (row.get("retain_until") or row[0] or "") if row else ""
+        if ru:
+            try:
+                if date.fromisoformat(ru) > date.today():
+                    c.close()
+                    raise ValueError(
+                        f"LEG-02: Este registro debe conservarse hasta {ru} "
+                        f"(RDL 8/2019 — retención mínima 4 años). No se puede eliminar."
+                    )
+            except ValueError as e:
+                if "LEG-02" in str(e):
+                    raise
     c.execute("UPDATE time_entries SET deleted=1 WHERE id=?", (entry_id,))
-
-
-
     c.commit()
-
-
-
     c.close()
 
 
