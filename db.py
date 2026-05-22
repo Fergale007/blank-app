@@ -158,6 +158,7 @@ class _PGConn:
 
     def commit(self):
         self._cn.commit()
+        self._dirty = False
 
     def close(self):
         if self._dirty:
@@ -1156,7 +1157,7 @@ def get_team(manager_id: int):
 
 
 
-def create_user(username, password, nombre, apellidos, email, role, dept_id, manager_id, comunidad, horas, dias_vac):
+def create_user(username, password, nombre, apellidos, email, role, dept_id, manager_id, comunidad, horas, dias_vac, cargo="", provincia="", localidad="", telefono=""):
 
 
 
@@ -1164,15 +1165,15 @@ def create_user(username, password, nombre, apellidos, email, role, dept_id, man
 
 
 
-    cur = c.execute("""INSERT INTO users (username,password_hash,nombre,apellidos,email,role,department_id,manager_id,comunidad_autonoma,horas_semanales,dias_vacaciones_anuales)
+    cur = c.execute("""INSERT INTO users (username,password_hash,nombre,apellidos,email,role,department_id,manager_id,comunidad_autonoma,horas_semanales,dias_vacaciones_anuales,cargo,provincia,localidad,telefono)
 
 
 
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
 
 
 
-              (username, hash_pw(password), nombre, apellidos, email, role, dept_id or None, manager_id or None, comunidad, horas, dias_vac))
+              (username, hash_pw(password), nombre, apellidos, email, role, dept_id or None, manager_id or None, comunidad, horas, dias_vac, cargo, provincia, localidad, telefono))
 
 
 
@@ -1215,6 +1216,14 @@ def update_user(uid: int, **kwargs):
         kwargs["password_hash"] = hash_pw(kwargs.pop("password"))
 
 
+
+    ALLOWED_COLS = {"nombre","apellidos","email","telefono","role","cargo",
+                    "department_id","manager_id","comunidad_autonoma",
+                    "horas_semanales","dias_vacaciones_anuales","activo",
+                    "password_hash","provincia","localidad","last_login"}
+    kwargs = {k: v for k, v in kwargs.items() if k in ALLOWED_COLS}
+    if not kwargs:
+        return
 
     cols = ", ".join(f"{k}=?" for k in kwargs)
 
@@ -1516,7 +1525,7 @@ def _get_holiday_set(comunidad, año):
 
 
 
-    return {r[0] for r in rows}
+    return {r["fecha"] for r in rows}
 
 
 
@@ -2460,7 +2469,7 @@ def get_vacation_balance(user_id, año):
         " WHERE user_id=? AND fecha_inicio>=? AND fecha_inicio<? AND estado='aprobada'",
         (user_id, d_ini, d_fin)).fetchall()
 
-    used = sum(r[0] for r in rows)
+    used = sum((r["dias_laborables"] or 0) for r in rows)
 
     pending_rows = c.execute(
         "SELECT dias_laborables FROM vacation_requests"
@@ -2469,7 +2478,7 @@ def get_vacation_balance(user_id, año):
 
     c.close()
 
-    pending = sum(r[0] for r in pending_rows)
+    pending = sum((r["dias_laborables"] or 0) for r in pending_rows)
 
 
 
@@ -2565,11 +2574,10 @@ def add_holiday(fecha, descripcion, tipo, comunidad, año):
 
 
 
-    except Exception:
-
-
-
-        pass
+    except Exception as e:
+        err = str(e).lower()
+        if "unique" not in err and "duplicate" not in err and "conflict" not in err:
+            raise
 
 
 
@@ -2737,7 +2745,7 @@ def get_unread_count(user_id: int) -> int:
 
 
 
-    n = c.execute("SELECT COUNT(*) FROM notifications WHERE user_id=? AND leido=0", (user_id,)).fetchone()[0]
+    n = c.execute("SELECT COUNT(*) as n FROM notifications WHERE user_id=? AND leido=0", (user_id,)).fetchone()["n"]
 
 
 
@@ -2925,19 +2933,17 @@ def get_global_stats():
 
 
 
-    total_users = c.execute("SELECT COUNT(*) FROM users WHERE activo=1").fetchone()[0]
+    row = c.execute("SELECT COUNT(*) as n FROM users WHERE activo=1").fetchone()
+    total_users = row["n"] if row else 0
 
+    row = c.execute("SELECT COUNT(*) as n FROM time_entries WHERE fecha=date('now') AND deleted=0").fetchone()
+    total_entries_today = row["n"] if row else 0
 
+    row = c.execute("SELECT COUNT(*) as n FROM vacation_requests WHERE estado='pendiente'").fetchone()
+    pending_requests = row["n"] if row else 0
 
-    total_entries_today = c.execute("SELECT COUNT(*) FROM time_entries WHERE fecha=date('now') AND deleted=0").fetchone()[0]
-
-
-
-    pending_requests = c.execute("SELECT COUNT(*) FROM vacation_requests WHERE estado='pendiente'").fetchone()[0]
-
-
-
-    open_incidents = c.execute("SELECT COUNT(*) FROM time_incidents WHERE estado='pendiente'").fetchone()[0]
+    row = c.execute("SELECT COUNT(*) as n FROM time_incidents WHERE estado='pendiente'").fetchone()
+    open_incidents = row["n"] if row else 0
 
 
 
