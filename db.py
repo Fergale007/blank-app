@@ -2450,42 +2450,24 @@ def get_vacation_balance(user_id, año):
 
 
 
+    d_ini = f"{año}-01-01"
+    d_fin = f"{año+1}-01-01"
+
     c = _conn()
-    c2 = c
 
-
-
-    rows = c.execute("""SELECT dias_laborables FROM vacation_requests
-
-
-
-                         WHERE user_id=? AND strftime('%Y',fecha_inicio)=? AND estado='aprobada'""",
-
-
-
-                     (user_id, str(año))).fetchall()
-
-
-
-    c.close()
-
-
+    rows = c.execute(
+        "SELECT dias_laborables FROM vacation_requests"
+        " WHERE user_id=? AND fecha_inicio>=? AND fecha_inicio<? AND estado='aprobada'",
+        (user_id, d_ini, d_fin)).fetchall()
 
     used = sum(r[0] for r in rows)
 
+    pending_rows = c.execute(
+        "SELECT dias_laborables FROM vacation_requests"
+        " WHERE user_id=? AND fecha_inicio>=? AND fecha_inicio<? AND estado='pendiente'",
+        (user_id, d_ini, d_fin)).fetchall()
 
-
-    pending_rows = c2.execute("""SELECT dias_laborables FROM vacation_requests
-
-
-
-                         WHERE user_id=? AND strftime('%Y',fecha_inicio)=? AND estado='pendiente'""",
-
-
-
-                     (user_id, str(año))).fetchall()
-
-
+    c.close()
 
     pending = sum(r[0] for r in pending_rows)
 
