@@ -72,7 +72,7 @@ import db
 
 st.set_page_config(
 
-    page_title="Ficha · Control Horario",
+    page_title="ODK Ficha",
 
     page_icon=_APP_ICON,
 
@@ -84,9 +84,12 @@ st.set_page_config(
 
 
 
-# ── Inject apple-touch-icon + PWA manifest into parent <head> ─────────────────
-# st.components injects into an iframe; we reach window.parent to set the real
-# favicon + apple-touch-icon so mobile "Add to Home Screen" uses our ODK icon.
+# ── iOS/Android home screen icon — triple approach ────────────────────────────
+# iOS reads apple-touch-icon for "Add to Home Screen". Three layers:
+#   1. st.markdown → <link> + <meta> tags injected into the page body
+#      (iOS Safari scans the full document, not just <head>)
+#   2. st.components iframe → window.parent.document.head patch (desktop/Android)
+#   3. page_icon PIL image → browser tab favicon
 
 def _inject_pwa_icons():
     icon_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "icon.png")
@@ -95,32 +98,41 @@ def _inject_pwa_icons():
     with open(icon_path, "rb") as _f:
         _icon_b64 = _b64.b64encode(_f.read()).decode()
     _data_url = f"data:image/png;base64,{_icon_b64}"
-    _manifest_json = _b64.b64encode(b'{"name":"ODK Ficha","short_name":"ODK Ficha","icons":[{"src":"","sizes":"512x512","type":"image/png"}],"display":"standalone","background_color":"#0a0812","theme_color":"#7C3AED","start_url":"/"}').decode()
+
+    # Layer 1: direct tags via st.markdown (runs in main page context, not iframe)
+    st.markdown(f"""
+<link rel="apple-touch-icon" sizes="512x512" href="{_data_url}">
+<link rel="apple-touch-icon-precomposed" sizes="512x512" href="{_data_url}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ODK Ficha">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#7C3AED">
+<meta name="application-name" content="ODK Ficha">
+""", unsafe_allow_html=True)
+
+    # Layer 2: iframe → window.parent patch (extra coverage for non-iOS)
     st.components.v1.html(f"""
 <script>
 (function(){{
   var ico = '{_data_url}';
   function patch(doc) {{
     try {{
-      // favicon
+      var al = doc.querySelector('link[rel="apple-touch-icon"]');
+      if (!al) {{ al = doc.createElement('link'); doc.head.appendChild(al); }}
+      al.rel = 'apple-touch-icon'; al.sizes = '512x512'; al.href = ico;
       var lk = doc.querySelector('link[rel~="icon"]');
       if (!lk) {{ lk = doc.createElement('link'); lk.rel = 'icon'; doc.head.appendChild(lk); }}
       lk.type = 'image/png'; lk.href = ico;
-      // apple touch icon
-      var al = doc.querySelector('link[rel="apple-touch-icon"]');
-      if (!al) {{ al = doc.createElement('link'); al.rel = 'apple-touch-icon'; doc.head.appendChild(al); }}
-      al.href = ico;
-      // theme-color
       var tc = doc.querySelector('meta[name="theme-color"]');
-      if (!tc) {{ tc = doc.createElement('meta'); tc.name = 'theme-color'; doc.head.appendChild(tc); }}
-      tc.content = '#7C3AED';
+      if (!tc) {{ tc = doc.createElement('meta'); doc.head.appendChild(tc); }}
+      tc.name = 'theme-color'; tc.content = '#7C3AED';
     }} catch(e) {{}}
   }}
   patch(document);
   try {{ patch(window.parent.document); }} catch(e) {{}}
 }})();
 </script>
-""", height=0)
+""", height=1)
 
 _inject_pwa_icons()
 
