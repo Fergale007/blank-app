@@ -1,0 +1,28 @@
+name: Keep ODK Ficha Alive
+
+# Pings the Streamlit app on a schedule to prevent sleep.
+# Public repo — unlimited free GitHub Actions minutes.
+#
+# Schedule (UTC times):
+#   Mon-Fri  05:00-22:00  every 30 min  → Canary Islands 06:00-23:00
+#   Sat-Sun  07:00-20:00  every 60 min  → keeps warm over weekends
+
+on:
+  schedule:
+    - cron: "*/30 5-22 * * 1-5"   # weekdays every 30 min
+    - cron: "0 7-20 * * 0,6"       # weekends every 60 min
+  workflow_dispatch:                 # manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    name: Ping Streamlit App
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Wake up ODK Ficha
+        run: |
+          echo "Ping at $(date -u)"
+          curl -o /dev/null -s --max-time 55 \
+            "https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app" \
+            && echo "✅ OK" || echo "⚠️ timeout (cold start, will be warm now)"
