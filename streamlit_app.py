@@ -428,6 +428,17 @@ def page_login():
 
     st.markdown(STYLES, unsafe_allow_html=True)
 
+    if st.session_state.get("login_blocked"):
+        import time
+        blocked_until = st.session_state.get("login_blocked_until", 0)
+        if time.time() < blocked_until:
+            remaining = int(blocked_until - time.time())
+            st.error(f"🔒 Demasiados intentos fallidos. Espera {remaining} segundos.")
+            return
+        else:
+            st.session_state["login_blocked"] = False
+            st.session_state["login_attempts"] = 0
+
     # Use columns to center the login card
 
     _, col, _ = st.columns([1, 1.1, 1])
@@ -448,15 +459,15 @@ def page_login():
 
             username = st.text_input("Usuario", placeholder="usuario")
 
-            password = st.text_input("Contrasena", type="password", placeholder="...")
+            password = st.text_input("Contraseña", type="password", placeholder="...")
 
             submitted = st.form_submit_button("Entrar", use_container_width=True, type="primary")
 
         # Self-contained footer block
 
         st.markdown("""
-<div style="padding:10px 14px 14px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:.8rem;color:#64748b">
-  <b>Acceso:</b> admin / bartendercocktail
+<div style="padding:10px 14px 14px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:.8rem;color:#64748b;text-align:center">
+  ¿Problemas para acceder? Contacta con tu responsable.
 </div>
 """, unsafe_allow_html=True)
 
@@ -466,6 +477,8 @@ def page_login():
 
             if user:
 
+                st.session_state["login_attempts"] = 0
+                st.session_state["login_blocked"] = False
                 st.session_state["user"] = user
 
                 db.audit(user["id"], "login", ip="0.0.0.0")
@@ -474,7 +487,12 @@ def page_login():
 
             else:
 
-                st.error("Usuario o contrasena incorrectos.")
+                st.session_state["login_attempts"] = st.session_state.get("login_attempts", 0) + 1
+                if st.session_state["login_attempts"] >= 5:
+                    import time
+                    st.session_state["login_blocked"] = True
+                    st.session_state["login_blocked_until"] = time.time() + 900  # 15 min
+                st.error("Usuario o contraseña incorrectos.")
 
 
 
@@ -2036,6 +2054,8 @@ def page_notificaciones():
 
 def page_equipo():
 
+    if not is_role("admin", "manager"): st.error("🔒 Acceso no autorizado."); return
+
     user = current_user()
 
     hoy = date.today()
@@ -2159,6 +2179,8 @@ def page_equipo():
 
 
 def page_aprobar():
+
+    if not is_role("admin", "manager"): st.error("🔒 Acceso no autorizado."); return
 
     user = current_user()
 
@@ -2307,6 +2329,8 @@ def page_aprobar():
 
 
 def page_admin_dashboard():
+
+    if not is_role("admin"): st.error("🔒 Acceso no autorizado."); return
 
     st.title("📊 Dashboard Administrador")
 
@@ -2498,7 +2522,8 @@ def _build_tree(users):
     return rows
 
 def page_usuarios():
-    st.title("Gestion de Usuarios")
+    if not is_role("admin"): st.error("🔒 Acceso no autorizado."); return
+    st.title("Gestión de Usuarios")
     tab_tree, tab_edit, tab_new = st.tabs(["Organigrama", "Editar usuario", "Nuevo usuario"])
 
     all_users = db.get_all_users()
@@ -2507,7 +2532,7 @@ def page_usuarios():
     dept_opts.update({d["nombre"]: d["id"] for d in depts})
 
     with tab_tree:
-        st.markdown("#### Estructura jerarquica")
+        st.markdown("#### Estructura jerárquica")
         tree = _build_tree(all_users)
         if not tree:
             st.info("No hay usuarios.")
@@ -2551,12 +2576,12 @@ def page_usuarios():
             nombre    = c1.text_input("Nombre",    value=ud.get("nombre",""))
             apellidos = c2.text_input("Apellidos", value=ud.get("apellidos",""))
             email     = c1.text_input("Email",     value=ud.get("email",""))
-            telefono  = c2.text_input("Telefono",  value=ud.get("telefono",""))
+            telefono  = c2.text_input("Teléfono",  value=ud.get("telefono",""))
 
-            st.markdown("**Puesto y jerarquia**")
+            st.markdown("**Puesto y jerarquía**")
             c3, c4 = st.columns(2)
             role = c3.selectbox(
-                "Nivel jerarquico", roles,
+                "Nivel jerárquico", roles,
                 format_func=lambda x: ROLE_EMOJI[x] + " " + ROLE_LABEL[x],
                 index=roles.index(ud.get("role","empleado")) if ud.get("role") in roles else 0,
             )
@@ -2567,7 +2592,7 @@ def page_usuarios():
                 index=cargo_opts.index(cur_cargo) if cur_cargo in cargo_opts else 0,
             )
 
-            st.markdown("**Organizacion**")
+            st.markdown("**Organización**")
             c5, c6 = st.columns(2)
             dept_keys     = list(dept_opts.keys())
             cur_dept_name = ud.get("dept_nombre") or "Sin departamento"
@@ -2586,15 +2611,15 @@ def page_usuarios():
 
             c7, c8 = st.columns(2)
             horas    = c7.number_input("Horas semanales", value=float(ud.get("horas_semanales",40)), min_value=1.0, max_value=40.0, step=0.5)
-            dias_vac = c8.number_input("Dias vacaciones/anio", value=int(ud.get("dias_vacaciones_anuales",22)), min_value=1, max_value=60)
+            dias_vac = c8.number_input("Días vacaciones/año", value=int(ud.get("dias_vacaciones_anuales",22)), min_value=1, max_value=60)
             comunidad = c7.selectbox(
-                "Comunidad autonoma", comunidades,
+                "Comunidad autónoma", comunidades,
                 index=comunidades.index(ud.get("comunidad_autonoma","madrid")) if ud.get("comunidad_autonoma") in comunidades else 0,
                 format_func=lambda x: COMUNIDADES_MAP[x],
             )
             activo = c8.checkbox("Activo", value=bool(ud.get("activo",1)))
 
-            st.markdown("**Ubicacion**")
+            st.markdown("**Ubicación**")
             c9, c10 = st.columns(2)
             prov_list = [""] + PROVINCIAS_ES
             cur_prov  = ud.get("provincia","") or ""
@@ -2602,7 +2627,7 @@ def page_usuarios():
                                      index=prov_list.index(cur_prov) if cur_prov in prov_list else 0)
             localidad = c10.text_input("Localidad", value=ud.get("localidad","") or "")
             comunidad_final = PROVINCIA_COMUNIDAD.get(provincia, comunidad) if provincia else comunidad
-            new_pw = st.text_input("Nueva contrasena (vacio = sin cambios)", type="password")
+            new_pw = st.text_input("Nueva contraseña (vacío = sin cambios)", type="password")
 
             if st.form_submit_button("Guardar cambios", type="primary"):
                 kw = dict(
@@ -2618,6 +2643,12 @@ def page_usuarios():
                     kw["password"] = new_pw
                 db.update_user(uid, **kw)
                 db.audit(current_user()["id"], "editar_usuario", "users", uid)
+                # Si el admin se editó a sí mismo, actualizar la sesión
+                if uid == current_user()["id"]:
+                    updated_user = db.get_user_by_id(uid)
+                    if updated_user:
+                        updated_safe = {k: v for k, v in updated_user.items() if k != "password_hash"}
+                        st.session_state["user"] = updated_safe
                 st.success("Usuario actualizado.")
                 st.rerun()
 
@@ -2626,16 +2657,16 @@ def page_usuarios():
             st.markdown("**Datos personales**")
             c1, c2 = st.columns(2)
             username  = c1.text_input("Usuario (login) *")
-            password  = c2.text_input("Contrasena *", type="password")
+            password  = c2.text_input("Contraseña *", type="password")
             nombre    = c1.text_input("Nombre *")
             apellidos = c2.text_input("Apellidos *")
             email     = c1.text_input("Email")
-            telefono  = c2.text_input("Telefono")
+            telefono  = c2.text_input("Teléfono")
 
-            st.markdown("**Puesto y jerarquia**")
+            st.markdown("**Puesto y jerarquía**")
             c3, c4 = st.columns(2)
             role_n  = c3.selectbox(
-                "Nivel jerarquico", ["empleado","manager","admin"],
+                "Nivel jerárquico", ["empleado","manager","admin"],
                 format_func=lambda x: ROLE_EMOJI[x] + " " + ROLE_LABEL[x],
                 key="new_role",
             )
@@ -2644,7 +2675,7 @@ def page_usuarios():
                 key="new_cargo",
             )
 
-            st.markdown("**Organizacion**")
+            st.markdown("**Organización**")
             c5, c6 = st.columns(2)
             dept_n = c5.selectbox("Departamento", list(dept_opts.keys()), key="new_dept")
             all_mgr_cands = [u for u in all_users if u["role"] in ("manager","admin")]
@@ -2657,18 +2688,18 @@ def page_usuarios():
 
             c7, c8 = st.columns(2)
             horas_n    = c7.number_input("Horas semanales", value=40.0, min_value=1.0, max_value=40.0, step=0.5, key="new_h")
-            dias_vac_n = c8.number_input("Dias vacaciones/anio", value=22, min_value=1, max_value=60, key="new_dv")
-            comunidad_n = c7.selectbox("Comunidad autonoma", list(COMUNIDADES_MAP.keys()),
+            dias_vac_n = c8.number_input("Días vacaciones/año", value=22, min_value=1, max_value=60, key="new_dv")
+            comunidad_n = c7.selectbox("Comunidad autónoma", list(COMUNIDADES_MAP.keys()),
                                        format_func=lambda x: COMUNIDADES_MAP[x], key="new_com")
 
-            st.markdown("**Ubicacion**")
+            st.markdown("**Ubicación**")
             c9, c10 = st.columns(2)
             prov_n = c9.selectbox("Provincia", [""]+PROVINCIAS_ES, key="new_prov")
             loc_n  = c10.text_input("Localidad", key="new_loc")
 
             if st.form_submit_button("Crear usuario", type="primary"):
                 if not username or not password or not nombre or not apellidos:
-                    st.error("Campos obligatorios: usuario, contrasena, nombre, apellidos.")
+                    st.error("Campos obligatorios: usuario, contraseña, nombre, apellidos.")
                 else:
                     try:
                         com_final = PROVINCIA_COMUNIDAD.get(prov_n, comunidad_n) if prov_n else comunidad_n
@@ -2689,7 +2720,7 @@ def page_usuarios():
             st.write("- " + d["nombre"])
         with st.form("new_dept"):
             dept_nombre = st.text_input("Nuevo departamento")
-            if st.form_submit_button("Anadir"):
+            if st.form_submit_button("Añadir"):
                 if dept_nombre:
                     db.create_department(dept_nombre)
                     st.success("Departamento creado.")
@@ -2697,6 +2728,8 @@ def page_usuarios():
 
 
 def page_festivos():
+
+    if not is_role("admin"): st.error("🔒 Acceso no autorizado."); return
 
     st.title("📅 Gestión de Festivos")
 
@@ -2780,6 +2813,8 @@ def page_festivos():
 
 def page_exportaciones():
 
+    if not is_role("admin"): st.error("🔒 Acceso no autorizado."); return
+
     st.title("📥 Exportaciones")
 
     st.markdown("""<div class="legal-box">
@@ -2848,11 +2883,22 @@ def page_exportaciones():
 
                     df = pd.DataFrame(entries)
 
-                    df = df[["fecha","emp_nombre","tipo","hora","observaciones","is_manual","ip"]].rename(columns={
+                    # Añadir columna de horas trabajadas diarias
+                    if not df.empty and "tipo" in df.columns:
+                        try:
+                            df["hora_dt"] = pd.to_datetime(df["hora"], errors="coerce")
+                            entradas = df[df["tipo"]=="entrada"].groupby("fecha")["hora_dt"].min()
+                            salidas = df[df["tipo"]=="salida"].groupby("fecha")["hora_dt"].max()
+                            horas_dia = ((salidas - entradas).dt.total_seconds() / 3600).round(2)
+                            df["horas_trabajadas"] = df["fecha"].map(horas_dia)
+                        except Exception:
+                            df["horas_trabajadas"] = ""
+
+                    df = df[["fecha","emp_nombre","tipo","hora","horas_trabajadas","observaciones","is_manual","ip"]].rename(columns={
 
                         "fecha":"Fecha","emp_nombre":"Empleado","tipo":"Tipo","hora":"Hora",
 
-                        "observaciones":"Observaciones","is_manual":"Manual","ip":"IP"})
+                        "horas_trabajadas":"Horas trabajadas","observaciones":"Observaciones","is_manual":"Manual","ip":"IP"})
 
                     df.to_excel(writer, sheet_name="Registro Horario", index=False)
 
@@ -3006,6 +3052,29 @@ def page_exportaciones():
 
             }).to_excel(writer, sheet_name="Info Legal", index=False)
 
+            # ── Professional Excel formatting ─────────────────────────────────
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+
+            def _format_sheet(ws, title_color="4F46E5"):
+                header_fill = PatternFill("solid", fgColor=title_color)
+                header_font = Font(bold=True, color="FFFFFF", size=10)
+                thin = Side(style="thin", color="CCCCCC")
+                border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                for cell in ws[1]:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.border = border
+                ws.freeze_panes = "A2"
+                for col_idx, col in enumerate(ws.columns, 1):
+                    max_len = max((len(str(cell.value or "")) for cell in col), default=8)
+                    ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 50)
+                ws.row_dimensions[1].height = 20
+
+            for sheet_name in writer.sheets:
+                _format_sheet(writer.sheets[sheet_name])
+
 
 
         out.seek(0)
@@ -3029,6 +3098,8 @@ def page_exportaciones():
 
 
 def page_auditoria():
+
+    if not is_role("admin"): st.error("🔒 Acceso no autorizado."); return
 
     st.title("🔍 Auditoría y Trazabilidad")
 
