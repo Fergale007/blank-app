@@ -47,7 +47,7 @@ st.set_page_config(
 
     page_title="Ficha · Control Horario",
 
-    page_icon="⏱️",
+    page_icon="🍸",
 
     layout="wide",
 
@@ -274,6 +274,133 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 
 
+# ── ODK Login CSS — dark luxury cocktail theme ────────────────────────────────
+
+LOGIN_CSS = """
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+/* Full-page dark background */
+.stApp {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 110%, rgba(202,138,4,.10) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 20% 20%,  rgba(180,100,0,.05) 0%, transparent 55%),
+    linear-gradient(160deg, #0a0804 0%, #120d04 55%, #0d0b08 100%) !important;
+  min-height:100vh;
+}
+
+/* Hide Streamlit chrome */
+[data-testid="stSidebar"]          { display:none !important; }
+header[data-testid="stHeader"]     { background:transparent !important; box-shadow:none !important; }
+[data-testid="stToolbar"]          { display:none !important; }
+[data-testid="stStatusWidget"]     { display:none !important; }
+[data-testid="stDeployButton"]     { display:none !important; }
+#MainMenu, footer                  { display:none !important; visibility:hidden !important; }
+
+/* Top padding */
+.block-container { padding-top:5vh !important; padding-bottom:2rem !important; max-width:100% !important; }
+
+/* ODK brand header */
+.odk-brand-wrap  { text-align:center; padding:36px 24px 24px; }
+.odk-brand-name  {
+  font-family:'Cormorant Garamond', Georgia, serif;
+  font-style:italic; font-weight:600;
+  font-size:3.8rem; letter-spacing:.26em; line-height:1;
+  color:#CA8A04;
+  text-shadow:0 0 50px rgba(202,138,4,.42), 0 2px 20px rgba(202,138,4,.16);
+  display:block; margin:12px 0 0;
+}
+.odk-brand-sub   {
+  font-family:'Montserrat', sans-serif;
+  font-size:.68rem; font-weight:500;
+  letter-spacing:.34em; text-transform:uppercase;
+  color:rgba(228,206,152,.42);
+  display:block; margin-top:7px;
+}
+.odk-gold-line   {
+  width:52px; height:1px;
+  background:linear-gradient(90deg, transparent, #CA8A04 45%, transparent);
+  margin:13px auto 0;
+}
+
+/* Glass form card */
+[data-testid="stForm"] {
+  background:rgba(255,255,255,.038) !important;
+  backdrop-filter:blur(28px) saturate(1.4) !important;
+  -webkit-backdrop-filter:blur(28px) saturate(1.4) !important;
+  border:1px solid rgba(202,138,4,.20) !important;
+  border-radius:16px !important;
+  padding:28px 26px 24px !important;
+  box-shadow:
+    0 0 0 1px rgba(202,138,4,.05),
+    0 28px 72px rgba(0,0,0,.48),
+    inset 0 1px 0 rgba(255,255,255,.055) !important;
+}
+
+/* Input labels */
+.stTextInput > label {
+  font-family:'Montserrat', sans-serif !important;
+  font-size:.70rem !important; font-weight:600 !important;
+  letter-spacing:.18em !important; text-transform:uppercase !important;
+  color:rgba(220,195,140,.68) !important;
+}
+
+/* Input fields */
+.stTextInput input {
+  background:rgba(255,255,255,.055) !important;
+  border:1px solid rgba(202,138,4,.22) !important;
+  border-radius:10px !important;
+  color:#f0e8d5 !important;
+  font-family:'Montserrat', sans-serif !important;
+  font-size:.9rem !important; letter-spacing:.02em !important;
+  transition:border-color .2s, box-shadow .2s !important;
+}
+.stTextInput input:focus {
+  border-color:rgba(202,138,4,.65) !important;
+  box-shadow:0 0 0 3px rgba(202,138,4,.12), 0 2px 10px rgba(202,138,4,.08) !important;
+  outline:none !important;
+}
+.stTextInput input::placeholder { color:rgba(220,195,140,.28) !important; }
+
+/* Submit button */
+[data-testid="stFormSubmitButton"] > button {
+  background:linear-gradient(135deg, #8a5d08 0%, #CA8A04 48%, #b8760a 100%) !important;
+  border:none !important; border-radius:10px !important;
+  color:#0a0804 !important;
+  font-family:'Montserrat', sans-serif !important;
+  font-weight:700 !important; font-size:.80rem !important;
+  letter-spacing:.24em !important; text-transform:uppercase !important;
+  padding:13px !important; width:100% !important;
+  box-shadow:0 6px 24px rgba(202,138,4,.28), 0 2px 8px rgba(0,0,0,.30) !important;
+  transition:all .25s ease !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+  transform:translateY(-1px) !important;
+  box-shadow:0 10px 32px rgba(202,138,4,.42), 0 4px 14px rgba(0,0,0,.35) !important;
+  background:linear-gradient(135deg, #9a6a0e 0%, #d99e14 48%, #c48610 100%) !important;
+}
+
+/* Error alert */
+[data-testid="stAlert"] {
+  background:rgba(180,20,20,.12) !important;
+  border:1px solid rgba(200,50,50,.28) !important;
+  border-radius:10px !important; color:#fca5a5 !important;
+}
+
+/* Footer help text */
+.odk-footer-txt {
+  font-family:'Montserrat', sans-serif;
+  font-size:.70rem; letter-spacing:.06em;
+  color:rgba(220,195,140,.32);
+  text-align:center; margin-top:14px; padding:0 4px;
+}
+</style>
+
+"""
+
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -426,7 +553,8 @@ def is_role(*roles) -> bool:
 
 def page_login():
 
-    st.markdown(STYLES, unsafe_allow_html=True)
+    # Inject dark ODK luxury theme (overrides STYLES already injected by main())
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
 
     if st.session_state.get("login_blocked"):
         import time
@@ -439,37 +567,42 @@ def page_login():
             st.session_state["login_blocked"] = False
             st.session_state["login_attempts"] = 0
 
-    # Use columns to center the login card
-
     _, col, _ = st.columns([1, 1.1, 1])
 
     with col:
 
-        # Self-contained header block (all divs closed)
-
+        # ── ODK brand header ──────────────────────────────────────────────────
         st.markdown("""
-<div style="text-align:center;padding:28px 24px 8px;background:white;border-radius:16px 16px 0 0;box-shadow:0 2px 12px rgba(0,0,0,.08)">
-  <div style="font-size:2.8rem;margin-bottom:4px">&#9201;</div>
-  <h2 style="margin:6px 0 2px;color:#1e1f2e;font-weight:700;font-size:1.7rem">Ficha</h2>
-  <p style="color:#64748b;font-size:.9rem;margin:0 0 8px">Control Horario &middot; RDL 8/2019</p>
+<div class="odk-brand-wrap">
+  <svg width="56" height="60" viewBox="0 0 56 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto">
+    <path d="M3 5 L28 39 L53 5 Z" stroke="#CA8A04" stroke-width="1.9" fill="rgba(202,138,4,0.08)" stroke-linejoin="round"/>
+    <path d="M17 21 L28 39 L39 21 Z" fill="rgba(202,138,4,0.18)"/>
+    <line x1="28" y1="39" x2="28" y2="53" stroke="#CA8A04" stroke-width="1.9" stroke-linecap="round"/>
+    <line x1="15" y1="53" x2="41" y2="53" stroke="#CA8A04" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="46" cy="10" r="4.2" fill="rgba(202,138,4,0.42)" stroke="#CA8A04" stroke-width="1.3"/>
+    <path d="M46 5.8 Q40 0.5 34 7" stroke="#CA8A04" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <circle cx="46" cy="10" r="1.6" fill="#CA8A04"/>
+  </svg>
+  <span class="odk-brand-name">ODK</span>
+  <div class="odk-gold-line"></div>
+  <span class="odk-brand-sub">Ficha &middot; Control Horario</span>
 </div>
 """, unsafe_allow_html=True)
 
+        # ── Login form ────────────────────────────────────────────────────────
         with st.form("login_form"):
 
-            username = st.text_input("Usuario", placeholder="usuario")
+            username = st.text_input("Usuario", placeholder="tu.usuario")
 
-            password = st.text_input("Contraseña", type="password", placeholder="...")
+            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
 
-            submitted = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("ACCEDER", use_container_width=True, type="primary")
 
-        # Self-contained footer block
-
-        st.markdown("""
-<div style="padding:10px 14px 14px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:.8rem;color:#64748b;text-align:center">
-  ¿Problemas para acceder? Contacta con tu responsable.
-</div>
-""", unsafe_allow_html=True)
+        # ── Footer ────────────────────────────────────────────────────────────
+        st.markdown(
+            '<p class="odk-footer-txt">¿Problemas para acceder? Contacta con tu responsable.</p>',
+            unsafe_allow_html=True
+        )
 
         if submitted:
 
