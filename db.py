@@ -30,6 +30,90 @@ DB = "ficha.db"
 
 
 
+
+import os as _os
+import re as _re
+
+# ── Database backend: SQLite (local) or PostgreSQL (Supabase/Cloud) ───────────
+_PG_URL = ""
+try:
+    import streamlit as _st
+    _PG_URL = (_st.secrets.get("DATABASE_URL", "") or "")
+except Exception:
+    pass
+if not _PG_URL:
+    _PG_URL = _os.environ.get("DATABASE_URL", "")
+_USE_PG = bool(_PG_URL)
+
+
+class _PGConn:
+    """
+    Wraps psycopg2 to behave like sqlite3.
+    Handles: ?->%s, INSERT OR IGNORE, datetime(), AUTOINCREMENT, lastrowid via RETURNING.
+    """
+    def __init__(self):
+        import psycopg2
+        import psycopg2.extras
+        self._cn  = psycopg2.connect(_PG_URL)
+        self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        self.lastrowid = None
+
+    @staticmethod
+    def _adapt(sql):
+        is_ignore = bool(_re.search(r"INSERT\s+OR\s+IGNORE", sql, _re.I))
+        sql = sql.replace("?", "%s")
+        sql = _re.sub(r"DEFAULT\s*\(datetime\('now'\)\)",
+                      "DEFAULT TO_CHAR(NOW(),'YYYY-MM-DD HH24:MI:SS')", sql)
+        sql = _re.sub(r"datetime\('now'\)",
+                      "TO_CHAR(NOW(),'YYYY-MM-DD HH24:MI:SS')", sql)
+        sql = _re.sub(r"date\('now'\)", "CURRENT_DATE::TEXT", sql)
+        sql = _re.sub(r"strftime\('%Y-%m',\s*(\w+)\)",
+                      r"TO_CHAR(\1::date,'YYYY-MM')", sql)
+        sql = _re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT",
+                      "SERIAL PRIMARY KEY", sql, flags=_re.I)
+        sql = _re.sub(r"\bAUTOINCREMENT\b", "", sql, flags=_re.I)
+        sql = _re.sub(r"INSERT\s+OR\s+IGNORE", "INSERT", sql, flags=_re.I)
+        if is_ignore:
+            sql = sql.rstrip("; ") + " ON CONFLICT DO NOTHING"
+        return sql, is_ignore
+
+    def execute(self, sql, params=()):
+        sql, is_ignore = self._adapt(sql)
+        is_ins = sql.strip().upper().startswith("INSERT")
+        has_ret = "RETURNING" in sql.upper()
+        if is_ins and not has_ret and not is_ignore:
+            sql = sql.rstrip("; ") + " RETURNING id"
+        self._cur.execute(sql, params if params else None)
+        if is_ins and not is_ignore:
+            row = self._cur.fetchone()
+            self.lastrowid = row["id"] if row else None
+        return self
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return dict(row) if row else None
+
+    def fetchall(self):
+        return [dict(r) for r in (self._cur.fetchall() or [])]
+
+    def commit(self):
+        self._cn.commit()
+
+    def close(self):
+        try:
+            self._cn.commit()
+        except Exception:
+            pass
+        self._cn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Connection ────────────────────────────────────────────────────────────────
 
 
@@ -39,21 +123,11 @@ DB = "ficha.db"
 
 
 def _conn():
-
-
-
+    if _USE_PG:
+        return _PGConn()
     c = sqlite3.connect(DB, check_same_thread=False)
-
-
-
     c.row_factory = sqlite3.Row
-
-
-
     c.execute("PRAGMA foreign_keys = ON")
-
-
-
     return c
 
 
@@ -783,12 +857,12 @@ def _seed_users(c):
     # Helper: get dept id by name
     def dept_id(name):
         row = c.execute("SELECT id FROM departments WHERE nombre=?", (name,)).fetchone()
-        return row[0] if row else None
+        return row["id"] if row else None
 
     # Helper: get user id by username
     def uid(uname):
         row = c.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone()
-        return row[0] if row else None
+        return row["id"] if row else None
 
     # --------------------------------------------------------------------------
     # LEVEL 0 — Director General (admin)
@@ -796,8 +870,8 @@ def _seed_users(c):
     # --------------------------------------------------------------------------
     admins = [
         # (username, pw, nombre, apellidos, email, role, dept, cargo, provincia, comunidad)
-        ("admin",      "Admin1234!",    "Admin",      "Sistema",           "admin@empresa.com",              "admin", "Direccion General", "Director General",  "",            "madrid"),
-        ("fmartinez",  "Temporal1234!", "Fernando",   "Martinez Robles",   "f.martinez@bartendercocktail.es","admin", "Direccion General", "Director General",  "A Coruna",    "galicia"),
+        ("admin",      "bartendercocktail",    "Admin",      "Sistema",           "admin@empresa.com",              "admin", "Direccion General", "Director General",  "",            "madrid"),
+        ("fmartinez",  "bartendercocktail", "Fernando",   "Martinez Robles",   "f.martinez@bartendercocktail.es","admin", "Direccion General", "Director General",  "A Coruna",    "galicia"),
     ]
     for u in admins:
         username, pw, nombre, apellidos, email, role, dept, cargo, provincia, com = u
@@ -816,11 +890,11 @@ def _seed_users(c):
 
     managers = [
         # (username, pw, nombre, apellidos, email, dept, cargo, provincia, comunidad)
-        ("chiki",      "Temporal1234!", "Chiki",     "",                   "chiki@caparta.com",                          "Comercial",       "Director de Area", "Formentera",           "baleares"),
-        ("triera",     "Temporal1234!", "Antonio",   "Riera",              "tonirierabartendercocktail@gmail.com",        "Comercial",       "Director de Area", "Albacete",             "castilla_la_mancha"),
-        ("farqueros",  "Temporal1234!", "Fernando",  "Arqueros Figueiredo","f.arqueros@bartendercocktail.es",             "Comercial",       "Director de Area", "Las Palmas",           "canarias"),
-        ("edelgado",   "Temporal1234!", "Eduardo",   "Delgado",            "e.delgado@bartendercocktail.es",              "Comercial",       "Director de Area", "Palencia",             "castilla_leon"),
-        ("susana",     "Temporal1234!", "Susana",    "",                   "administracion@bartendercocktail.es",         "Administracion",  "Director de Area", "",                    "madrid"),
+        ("chiki",      "bartendercocktail", "Chiki",     "",                   "chiki@caparta.com",                          "Comercial",       "Director de Area", "Formentera",           "baleares"),
+        ("triera",     "bartendercocktail", "Antonio",   "Riera",              "tonirierabartendercocktail@gmail.com",        "Comercial",       "Director de Area", "Albacete",             "castilla_la_mancha"),
+        ("farqueros",  "bartendercocktail", "Fernando",  "Arqueros Figueiredo","f.arqueros@bartendercocktail.es",             "Comercial",       "Director de Area", "Las Palmas",           "canarias"),
+        ("edelgado",   "bartendercocktail", "Eduardo",   "Delgado",            "e.delgado@bartendercocktail.es",              "Comercial",       "Director de Area", "Palencia",             "castilla_leon"),
+        ("susana",     "bartendercocktail", "Susana",    "",                   "administracion@bartendercocktail.es",         "Administracion",  "Director de Area", "",                    "madrid"),
     ]
     for u in managers:
         username, pw, nombre, apellidos, email, dept, cargo, provincia, com = u
@@ -837,12 +911,12 @@ def _seed_users(c):
     # --------------------------------------------------------------------------
     empleados = [
         # (username, pw, nombre, apellidos, email, dept, cargo, manager_username)
-        ("menriquez",  "Temporal1234!", "Manuel",   "Enriquez",  "m.enriquez@bartendercocktail.es",   "Comercial",      "Comercial",                "fmartinez"),
-        ("arosa",      "Temporal1234!", "Antonio",  "Rosa",      "a.rosa@bartendercocktail.es",        "Comercial",      "Comercial",                "fmartinez"),
-        ("cferreira",  "Temporal1234!", "Carlos",   "Ferreira",  "c.ferreira@bartendercocktail.es",    "Comercial",      "Comercial",                "triera"),
-        ("damian",     "Temporal1234!", "Damian",   "",          "damianodk2025@gmail.com",             "Comercial",      "Comercial",                "chiki"),
-        ("vbonilla",   "Temporal1234!", "Vicente",  "Bonilla",   "bonillapuertas@gmail.com",            "Comercial",      "Comercial",                "fmartinez"),
-        ("pablo",      "Temporal1234!", "Pablo",    "",          "info@bartendercocktail.es",           "Administracion", "Responsable Administracion","susana"),
+        ("menriquez",  "bartendercocktail", "Manuel",   "Enriquez",  "m.enriquez@bartendercocktail.es",   "Comercial",      "Comercial",                "fmartinez"),
+        ("arosa",      "bartendercocktail", "Antonio",  "Rosa",      "a.rosa@bartendercocktail.es",        "Comercial",      "Comercial",                "fmartinez"),
+        ("cferreira",  "bartendercocktail", "Carlos",   "Ferreira",  "c.ferreira@bartendercocktail.es",    "Comercial",      "Comercial",                "triera"),
+        ("damian",     "bartendercocktail", "Damian",   "",          "damianodk2025@gmail.com",             "Comercial",      "Comercial",                "chiki"),
+        ("vbonilla",   "bartendercocktail", "Vicente",  "Bonilla",   "bonillapuertas@gmail.com",            "Comercial",      "Comercial",                "fmartinez"),
+        ("pablo",      "bartendercocktail", "Pablo",    "",          "info@bartendercocktail.es",           "Administracion", "Responsable Administracion","susana"),
     ]
     for u in empleados:
         username, pw, nombre, apellidos, email, dept, cargo, mgr_uname = u
