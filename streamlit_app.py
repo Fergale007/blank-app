@@ -356,8 +356,8 @@ PROVINCIAS_ES = [
 
 PROVINCIA_COMUNIDAD = {
     "Álava": "pais_vasco", "Guipúzcoa": "pais_vasco", "Vizcaya": "pais_vasco",
-    "Barcelona": "catalüña", "Girona": "catalüña", "Lleida": "catalüña",
-    "Tarragona": "catalüña",
+    "Barcelona": "cataluña", "Girona": "cataluña", "Lleida": "cataluña",
+    "Tarragona": "cataluña",
     "Las Palmas": "canarias", "Santa Cruz de Tenerife": "canarias",
     "Alicante": "valencia", "Castellón": "valencia", "Valencia": "valencia",
     "A Coruña": "galicia", "Lugo": "galicia", "Ourense": "galicia",
@@ -448,7 +448,7 @@ def page_login():
 
         st.markdown("""
 <div style="padding:10px 14px 14px;background:#f8fafc;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;font-size:.8rem;color:#64748b">
-  <b>Demo:</b> admin / Admin1234! &nbsp;&middot;&nbsp; manager1 / Manager123! &nbsp;&middot;&nbsp; empleado1 / Empleado123!
+  <b>Acceso:</b> admin / bartendercocktail
 </div>
 """, unsafe_allow_html=True)
 
@@ -3084,7 +3084,9 @@ def page_auditoria():
 
 def main():
 
-    db.init_db()
+    if not st.session_state.get("_db_ready"):
+        db.init_db()
+        st.session_state["_db_ready"] = True
 
     st.markdown(STYLES, unsafe_allow_html=True)
 
