@@ -5,16 +5,24 @@ import streamlit as st
 import re as _re
 
 # ── HTML blank-line fix ───────────────────────────────────────────────────────
-# The file uses double-spacing (blank line after every code line).
-# Inside f-string HTML blocks this causes CommonMark to terminate HTML blocks
-# at the first blank line, showing the rest as raw text.
-# This patch strips blank lines from HTML content before Markdown processes it.
-_st_markdown_orig = st.markdown
-def _st_markdown_fixed(body, **kwargs):
+# Patch DeltaGenerator.markdown so ALL containers (columns, expanders, tabs…)
+# get blank lines stripped from HTML — not just st.markdown.
+def _fix_html(body, kwargs):
     if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
-        body = _re.sub(r'\n[ \t]*\n', '\n', body)
-    return _st_markdown_orig(body, **kwargs)
-st.markdown = _st_markdown_fixed
+        return _re.sub(r'\n[ \t]*\n', '\n', body)
+    return body
+
+try:
+    from streamlit.delta_generator import DeltaGenerator as _DG
+    _dg_md_orig = _DG.markdown
+    def _dg_md_patched(self, body, **kwargs):
+        return _dg_md_orig(self, _fix_html(body, kwargs), **kwargs)
+    _DG.markdown = _dg_md_patched
+except Exception:
+    _st_markdown_orig = st.markdown
+    def _st_markdown_fixed(body, **kwargs):
+        return _st_markdown_orig(_fix_html(body, kwargs), **kwargs)
+    st.markdown = _st_markdown_fixed
 # ─────────────────────────────────────────────────────────────────────────────
 
 import pandas as pd
