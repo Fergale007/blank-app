@@ -54,7 +54,17 @@ class _PGConn:
     def __init__(self):
         import psycopg2
         import psycopg2.extras
-        self._cn  = psycopg2.connect(_PG_URL)
+        from urllib.parse import urlparse, unquote
+        _p = urlparse(_PG_URL)
+        self._cn = psycopg2.connect(
+            host=_p.hostname,
+            port=_p.port or 5432,
+            dbname=(_p.path or "/postgres").lstrip("/"),
+            user=unquote(_p.username or "postgres"),
+            password=unquote(_p.password or ""),
+            sslmode="require",
+            connect_timeout=10,
+        )
         self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.lastrowid = None
 
