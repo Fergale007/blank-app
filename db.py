@@ -653,6 +653,24 @@ def init_db():
 
         )""",
 
+        """CREATE TABLE IF NOT EXISTS approval_tokens (
+
+            token TEXT PRIMARY KEY,
+
+            request_id INTEGER NOT NULL REFERENCES vacation_requests(id),
+
+            action TEXT NOT NULL,
+
+            manager_id INTEGER REFERENCES users(id),
+
+            expires_at TEXT NOT NULL,
+
+            used INTEGER DEFAULT 0,
+
+            created_at TEXT DEFAULT (datetime('now'))
+
+        )""",
+
 
 
     ]
@@ -705,7 +723,13 @@ def init_db():
 
 def _seed_holidays(c):
 
-
+    # Skip if already seeded for current year (avoids 80+ PG round-trips on every cold start)
+    try:
+        row = c.execute("SELECT COUNT(*) as n FROM holidays WHERE año >= ?", (date.today().year,)).fetchone()
+        if row and (row["n"] if isinstance(row, dict) else row[0]) > 10:
+            return
+    except Exception:
+        pass
 
     data = [
 
@@ -913,6 +937,13 @@ def _seed_departments(c):
             pass
 
 def _seed_users(c):
+    # Skip if users already exist (avoids re-seeding on every cold start)
+    try:
+        row = c.execute("SELECT COUNT(*) as n FROM users").fetchone()
+        if row and (row["n"] if isinstance(row, dict) else row[0]) > 0:
+            return
+    except Exception:
+        pass
     # Always seed departments first
     _seed_departments(c)
     c.commit()
@@ -2152,10 +2183,43 @@ def dias_laborables(f_ini: date, f_fin: date, comunidad="madrid"):
 
 
 
+def _odk_email_wrap(inner_html: str, title: str) -> str:
+    """Wraps inner HTML in the ODK branded email shell (dark luxury, email-safe inline CSS)."""
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title></head>
+<body style="margin:0;padding:0;background:#f0ead8;font-family:Georgia,'Times New Roman',serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0ead8;padding:28px 12px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#0d0b08;border-radius:16px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.35);">
+
+  <!-- Header -->
+  <tr><td style="background:linear-gradient(160deg,#100c04,#1a1005);padding:32px 36px 24px;text-align:center;border-bottom:1px solid rgba(202,138,4,.20);">
+    <div style="font-family:Georgia,serif;font-size:30px;font-weight:bold;font-style:italic;color:#CA8A04;letter-spacing:8px;">ODK</div>
+    <div style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;letter-spacing:4px;text-transform:uppercase;margin-top:5px;">Ficha &middot; Control Horario</div>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:32px 36px;">
+    {inner_html}
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:14px 36px 22px;border-top:1px solid rgba(202,138,4,.12);text-align:center;">
+    <span style="color:rgba(220,195,140,.22);font-family:Arial,sans-serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;">ODK &middot; Control Horario RDL 8/2019 &middot; RGPD</span>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
+
 def send_vacation_email(to_email, empleado_nombre, tipo_aus, estado,
                         fecha_ini, fecha_fin, dias_lab, comentario_mgr,
                         dias_disfrutados, dias_anuales):
-    """Send email notification for vacation approval/denial. Returns True if sent."""
+    """Send HTML email notification to employee after approval/denial."""
     if not to_email:
         return False
     try:
@@ -2165,37 +2229,238 @@ def send_vacation_email(to_email, empleado_nombre, tipo_aus, estado,
         cfg = getattr(st, "secrets", {})
         host = cfg.get("SMTP_HOST", "")
         port = int(cfg.get("SMTP_PORT", 587))
-        user = cfg.get("SMTP_USER", "")
+        smtp_user = cfg.get("SMTP_USER", "")
         pwd  = cfg.get("SMTP_PASS", "")
-        frm  = cfg.get("SMTP_FROM", user)
-        if not host or not user or not pwd:
+        frm  = cfg.get("SMTP_FROM", smtp_user)
+        if not host or not smtp_user or not pwd:
             return False
-        icon = "✅" if estado == "aprobada" else "❌"
+
+        aprobada = estado == "aprobada"
+        icon_color = "#16a34a" if aprobada else "#dc2626"
+        icon_bg    = "rgba(22,163,74,.12)" if aprobada else "rgba(220,38,38,.12)"
+        icon_txt   = "✓ APROBADA" if aprobada else "✗ DENEGADA"
         dias_pendientes = max(0, dias_anuales - dias_disfrutados)
-        subject = f"{icon} Solicitud de {tipo_aus} — {estado.upper()}"
-        body = f"""Hola {empleado_nombre},
+        tipo_label = tipo_aus.replace("_", " ").title()
 
-Tu solicitud de {tipo_aus} ha sido {estado.upper()} {icon}
+        inner = f"""
+<div style="text-align:center;margin-bottom:28px;">
+  <div style="display:inline-block;background:{icon_bg};border:1px solid {icon_color};border-radius:50px;padding:10px 28px;color:{icon_color};font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:3px;">{icon_txt}</div>
+</div>
+<p style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:15px;margin:0 0 6px;">Hola <strong>{empleado_nombre}</strong>,</p>
+<p style="color:rgba(220,195,140,.65);font-family:Arial,sans-serif;font-size:13px;line-height:1.7;margin:0 0 24px;">
+  Tu solicitud de <strong style="color:#f0e8d5;">{tipo_label}</strong> ha sido {"<strong style='color:#16a34a;'>aprobada</strong>" if aprobada else "<strong style='color:#dc2626;'>denegada</strong>"}.
+</p>
 
-📅 Período: {fecha_ini} — {fecha_fin}
-📊 Días laborables: {dias_lab}
-💬 Comentario del responsable: {comentario_mgr or 'Sin comentario'}
-
-📈 Resumen de vacaciones ({date.today().year}):
-   • Días disfrutados: {dias_disfrutados} de {dias_anuales}
-   • Días pendientes: {dias_pendientes}
-
-— Sistema Ficha · Control Horario SaaS (RDL 8/2019)
+<table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,.04);border:1px solid rgba(202,138,4,.18);border-radius:12px;margin-bottom:24px;">
+  <tr><td style="padding:18px 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="padding-bottom:12px;border-bottom:1px solid rgba(202,138,4,.10);">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Período</span><br>
+        <span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:14px;">{fecha_ini} &rarr; {fecha_fin} &nbsp;·&nbsp; <strong style="color:#CA8A04;">{dias_lab} días laborables</strong></span>
+      </td></tr>
+      {"" if not comentario_mgr else f'<tr><td style="padding:12px 0;border-bottom:1px solid rgba(202,138,4,.10);"><span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Comentario del responsable</span><br><span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:13px;font-style:italic;">{comentario_mgr}</span></td></tr>'}
+      <tr><td style="padding-top:12px;">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Saldo {date.today().year}</span><br>
+        <span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:13px;">Disfrutados: <strong style="color:#CA8A04;">{dias_disfrutados}</strong> de {dias_anuales} &nbsp;·&nbsp; Pendientes: <strong style="color:#CA8A04;">{dias_pendientes}</strong></span>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 """
-        msg = MIMEMultipart()
+        subject = f"{'✓' if aprobada else '✗'} Tu solicitud de {tipo_label} ha sido {estado}"
+        html = _odk_email_wrap(inner, subject)
+
+        msg = MIMEMultipart("alternative")
         msg["From"] = frm
         msg["To"] = to_email
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain", "utf-8"))
+        msg.attach(MIMEText(html, "html", "utf-8"))
         with smtplib.SMTP(host, port) as srv:
             srv.starttls()
-            srv.login(user, pwd)
+            srv.login(smtp_user, pwd)
             srv.sendmail(frm, to_email, msg.as_string())
+        return True
+    except Exception:
+        return False
+
+
+def _create_approval_tokens(request_id: int, manager_id: int) -> tuple:
+    """Create one-click approve/deny tokens for a vacation request. Returns (approve_token, deny_token)."""
+    import secrets as _secrets
+    tok_apr = _secrets.token_urlsafe(32)
+    tok_den = _secrets.token_urlsafe(32)
+    expires = (datetime.now() + timedelta(hours=72)).strftime("%Y-%m-%d %H:%M:%S")
+    c = _conn()
+    try:
+        for tok, action in [(tok_apr, "approve"), (tok_den, "deny")]:
+            c.execute(
+                "INSERT INTO approval_tokens (token,request_id,action,manager_id,expires_at) VALUES (?,?,?,?,?)",
+                (tok, request_id, action, manager_id, expires)
+            )
+        c.commit()
+    except Exception:
+        try: c.execute("ROLLBACK")
+        except Exception: pass
+    finally:
+        c.close()
+    return tok_apr, tok_den
+
+
+def validate_and_use_token(token: str) -> dict:
+    """
+    Validate an email one-click token, execute the action if valid, and mark it used.
+    Returns dict with keys: status ('ok'|'expired'|'used'|'invalid'), action, request_id, emp_nombre, tipo, fecha_ini, fecha_fin
+    """
+    c = _conn()
+    try:
+        row = c.execute(
+            "SELECT * FROM approval_tokens WHERE token=?", (token,)
+        ).fetchone()
+        if not row:
+            return {"status": "invalid"}
+        row = dict(row)
+        if row["used"]:
+            return {"status": "used", "action": row["action"]}
+        if datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S") < datetime.now():
+            return {"status": "expired", "action": row["action"]}
+
+        req = c.execute(
+            """SELECT vr.*, u.nombre, u.apellidos, u.email, u.dias_vacaciones_anuales
+               FROM vacation_requests vr JOIN users u ON vr.user_id=u.id
+               WHERE vr.id=?""", (row["request_id"],)
+        ).fetchone()
+        if not req:
+            return {"status": "invalid"}
+        req = dict(req)
+        if req["estado"] != "pendiente":
+            return {"status": "used", "action": row["action"], "estado": req["estado"]}
+
+        nuevo_estado = "aprobada" if row["action"] == "approve" else "denegada"
+        resolve_request(row["request_id"], nuevo_estado, row["manager_id"], "Aprobado desde email")
+
+        # Invalidate BOTH tokens for this request
+        c.execute("UPDATE approval_tokens SET used=1 WHERE request_id=?", (row["request_id"],))
+        c.commit()
+
+        # Send result email to employee
+        try:
+            bal = get_vacation_balance(req["user_id"], date.today().year)
+            used_days = (bal or {}).get("used", 0)
+            send_vacation_email(
+                req["email"],
+                f"{req['nombre']} {req['apellidos']}",
+                req.get("tipo","vacaciones"), nuevo_estado,
+                req["fecha_inicio"], req["fecha_fin"],
+                req.get("dias_laborables",0),
+                "Aprobado desde email", used_days,
+                req.get("dias_vacaciones_anuales", 22)
+            )
+        except Exception:
+            pass
+
+        return {
+            "status": "ok",
+            "action": row["action"],
+            "nuevo_estado": nuevo_estado,
+            "emp_nombre": f"{req['nombre']} {req['apellidos']}",
+            "tipo": req.get("tipo","vacaciones"),
+            "fecha_ini": req["fecha_inicio"],
+            "fecha_fin": req["fecha_fin"],
+        }
+    except Exception as e:
+        return {"status": "invalid", "error": str(e)}
+    finally:
+        c.close()
+
+
+def send_manager_request_email(manager_email: str, manager_nombre: str,
+                                empleado_nombre: str, tipo_aus: str,
+                                fecha_ini: str, fecha_fin: str, dias_lab: int,
+                                comentario_emp: str,
+                                tok_approve: str, tok_deny: str,
+                                app_url: str = "") -> bool:
+    """Send ODK-branded HTML email to manager with one-click approve/deny links."""
+    if not manager_email:
+        return False
+    try:
+        import smtplib, streamlit as st
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        cfg = getattr(st, "secrets", {})
+        host      = cfg.get("SMTP_HOST", "")
+        port      = int(cfg.get("SMTP_PORT", 587))
+        smtp_user = cfg.get("SMTP_USER", "")
+        pwd       = cfg.get("SMTP_PASS", "")
+        frm       = cfg.get("SMTP_FROM", smtp_user)
+        if not app_url:
+            app_url = cfg.get("APP_URL", "https://ficha.streamlit.app")
+        if not host or not smtp_user or not pwd:
+            return False
+
+        tipo_label = tipo_aus.replace("_", " ").title()
+        approve_url = f"{app_url}?tok={tok_approve}"
+        deny_url    = f"{app_url}?tok={tok_deny}"
+
+        inner = f"""
+<h2 style="color:#f0e8d5;font-family:Georgia,serif;font-size:20px;margin:0 0 6px;">Nueva solicitud pendiente</h2>
+<p style="color:rgba(220,195,140,.60);font-family:Arial,sans-serif;font-size:13px;line-height:1.7;margin:0 0 24px;">
+  <strong style="color:#f0e8d5;">{empleado_nombre}</strong> ha solicitado {tipo_label.lower()} y requiere tu aprobación.
+</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,.04);border:1px solid rgba(202,138,4,.18);border-radius:12px;margin-bottom:26px;">
+  <tr><td style="padding:18px 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="padding-bottom:12px;border-bottom:1px solid rgba(202,138,4,.10);">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Empleado</span><br>
+        <span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">{empleado_nombre}</span>
+      </td></tr>
+      <tr><td style="padding:12px 0;border-bottom:1px solid rgba(202,138,4,.10);">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Tipo</span><br>
+        <span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:14px;">{tipo_label}</span>
+      </td></tr>
+      <tr><td style="padding:12px 0;border-bottom:1px solid rgba(202,138,4,.10);">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Período</span><br>
+        <span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:14px;">{fecha_ini} &rarr; {fecha_fin}</span>
+      </td></tr>
+      <tr><td style="padding-top:12px;">
+        <span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Días laborables</span><br>
+        <span style="color:#CA8A04;font-family:Georgia,serif;font-size:26px;font-weight:bold;">{dias_lab}</span>
+      </td></tr>
+      {"" if not comentario_emp else f'<tr><td style="padding-top:12px;border-top:1px solid rgba(202,138,4,.10);"><span style="color:rgba(220,195,140,.45);font-family:Arial,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:2px;">Nota del empleado</span><br><span style="color:#f0e8d5;font-family:Arial,sans-serif;font-size:13px;font-style:italic;">{comentario_emp}</span></td></tr>'}
+    </table>
+  </td></tr>
+</table>
+
+<!-- Action buttons -->
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+  <tr>
+    <td width="48%">
+      <a href="{approve_url}" style="display:block;background:linear-gradient(135deg,#14532d,#16a34a);color:#ffffff;text-decoration:none;text-align:center;padding:14px 10px;border-radius:10px;font-family:Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;">&#10003;&nbsp; APROBAR</a>
+    </td>
+    <td width="4%"></td>
+    <td width="48%">
+      <a href="{deny_url}" style="display:block;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.35);color:#fca5a5;text-decoration:none;text-align:center;padding:13px 10px;border-radius:10px;font-family:Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:3px;text-transform:uppercase;">&#10007;&nbsp; DENEGAR</a>
+    </td>
+  </tr>
+</table>
+
+<p style="color:rgba(220,195,140,.28);font-family:Arial,sans-serif;font-size:10px;text-align:center;margin:0;line-height:1.6;">
+  Enlace de un solo uso &middot; caduca en 72&nbsp;horas<br>
+  También puedes gestionar esta solicitud desde la aplicación.
+</p>
+"""
+        subject = f"⏳ Solicitud de {tipo_label} de {empleado_nombre} — pendiente de aprobación"
+        html = _odk_email_wrap(inner, subject)
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = frm
+        msg["To"] = manager_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP(host, port) as srv:
+            srv.starttls()
+            srv.login(smtp_user, pwd)
+            srv.sendmail(frm, manager_email, msg.as_string())
         return True
     except Exception:
         return False
@@ -2237,11 +2502,29 @@ def create_vac_request(user_id, f_ini, f_fin, tipo, comentario, comunidad="madri
 
     c.commit()
 
-
-
     c.close()
 
-
+    # ── Email manager with one-click approve/deny ─────────────────────────────
+    try:
+        emp = get_user_by_id(user_id)
+        if emp and emp.get("manager_id"):
+            mgr = get_user_by_id(emp["manager_id"])
+            if mgr and mgr.get("email"):
+                tok_a, tok_d = _create_approval_tokens(rid, mgr["id"])
+                send_manager_request_email(
+                    manager_email=mgr["email"],
+                    manager_nombre=f"{mgr['nombre']} {mgr.get('apellidos','')}",
+                    empleado_nombre=f"{emp['nombre']} {emp.get('apellidos','')}",
+                    tipo_aus=tipo,
+                    fecha_ini=str(f_ini),
+                    fecha_fin=str(f_fin),
+                    dias_lab=dl,
+                    comentario_emp=comentario or "",
+                    tok_approve=tok_a,
+                    tok_deny=tok_d,
+                )
+    except Exception:
+        pass  # Email failure never blocks the request creation
 
     return rid
 
