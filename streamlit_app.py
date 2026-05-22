@@ -13,10 +13,10 @@ import textwrap as _textwrap
 
 def _fix_html(body, kwargs):
     if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
-        # Step 1: dedent (remove common leading whitespace so no line starts
-        # with 4+ spaces, which CommonMark would treat as a code block)
-        body = _textwrap.dedent(body)
-        # Step 2: collapse blank lines (CommonMark HTML blocks end at blank lines)
+        # 1. dedent — removes common leading whitespace (4+ spaces = code block in CommonMark)
+        # 2. strip  — removes the leading \n that would push <div> away from column 0
+        # 3. re.sub — collapses blank lines (CommonMark HTML block ends at first blank line)
+        body = _textwrap.dedent(body).strip()
         body = _re.sub(r'\n[ \t]*\n', '\n', body)
         return body
     return body
