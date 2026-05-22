@@ -67,15 +67,15 @@ def _get_raw_pg():
     cn = getattr(_pg_local, "cn", None)
     if cn is None or cn.closed:
         _pg_local.cn = _make_raw_pg()
-        return _pg_local.cn
+    return _pg_local.cn
+
+def _reset_raw_pg():
     try:
-        cn.cursor().execute("SELECT 1")
-        return cn
-    except Exception:
-        try: cn.close()
-        except Exception: pass
-        _pg_local.cn = _make_raw_pg()
-        return _pg_local.cn
+        cn = getattr(_pg_local, "cn", None)
+        if cn: cn.close()
+    except Exception: pass
+    _pg_local.cn = _make_raw_pg()
+    return _pg_local.cn
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -86,9 +86,10 @@ class _PGConn:
     """
     def __init__(self):
         import psycopg2.extras
-        self._cn  = _get_raw_pg()
-        self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        self._cn    = _get_raw_pg()
+        self._cur   = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.lastrowid = None
+        self._dirty = False   # tracks if any write happened
 
     @staticmethod
     def _adapt(sql):
@@ -101,6 +102,8 @@ class _PGConn:
         sql = _re.sub(r"date\('now'\)", "CURRENT_DATE::TEXT", sql)
         sql = _re.sub(r"strftime\('%Y-%m',\s*(\w+)\)",
                       r"TO_CHAR(\1::date,'YYYY-MM')", sql)
+        sql = _re.sub(r"strftime\('%Y',\s*(\w+)\)",
+                      r"EXTRACT(YEAR FROM \1::date)::TEXT", sql)
         sql = _re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT",
                       "SERIAL PRIMARY KEY", sql, flags=_re.I)
         sql = _re.sub(r"\bAUTOINCREMENT\b", "", sql, flags=_re.I)
@@ -111,11 +114,24 @@ class _PGConn:
 
     def execute(self, sql, params=()):
         sql, is_ignore = self._adapt(sql)
-        is_ins = sql.strip().upper().startswith("INSERT")
+        is_ins  = sql.strip().upper().startswith("INSERT")
+        is_write = is_ins or bool(_re.match(r"\s*(UPDATE|DELETE)", sql, _re.I))
         has_ret = "RETURNING" in sql.upper()
         if is_ins and not has_ret and not is_ignore:
             sql = sql.rstrip("; ") + " RETURNING id"
-        self._cur.execute(sql, params if params else None)
+        try:
+            self._cur.execute(sql, params if params else None)
+        except Exception as _e:
+            import psycopg2
+            if isinstance(_e, (psycopg2.OperationalError, psycopg2.InterfaceError)):
+                import psycopg2.extras
+                self._cn  = _reset_raw_pg()
+                self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                self._cur.execute(sql, params if params else None)
+            else:
+                raise
+        if is_write:
+            self._dirty = True
         if is_ins and not is_ignore:
             row = self._cur.fetchone()
             self.lastrowid = row["id"] if row else None
@@ -144,11 +160,13 @@ class _PGConn:
         self._cn.commit()
 
     def close(self):
-        try:
-            self._cn.commit()
-        except Exception:
-            try: self._cn.rollback()
-            except Exception: pass
+        if self._dirty:
+            try:
+                self._cn.commit()
+                self._dirty = False
+            except Exception:
+                try: self._cn.rollback()
+                except Exception: pass
 
     def __enter__(self):
         return self
@@ -2433,6 +2451,7 @@ def get_vacation_balance(user_id, año):
 
 
     c = _conn()
+    c2 = c
 
 
 
@@ -2456,7 +2475,7 @@ def get_vacation_balance(user_id, año):
 
 
 
-    pending_rows = _conn().execute("""SELECT dias_laborables FROM vacation_requests
+    pending_rows = c2.execute("""SELECT dias_laborables FROM vacation_requests
 
 
 
