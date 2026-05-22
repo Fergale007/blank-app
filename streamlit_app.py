@@ -3290,6 +3290,85 @@ def page_auditoria():
 
 
 
+# ── Email one-click approval page ─────────────────────────────────────────────
+
+
+
+def page_token_action(token: str):
+    """Handles one-click approve/deny links from manager notification emails."""
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1, 1.2, 1])
+
+    with col:
+
+        st.markdown("""
+<div class="odk-brand-wrap">
+  <svg width="48" height="52" viewBox="0 0 56 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto">
+    <path d="M3 5 L28 39 L53 5 Z" stroke="#CA8A04" stroke-width="1.9" fill="rgba(202,138,4,0.08)" stroke-linejoin="round"/>
+    <path d="M17 21 L28 39 L39 21 Z" fill="rgba(202,138,4,0.18)"/>
+    <line x1="28" y1="39" x2="28" y2="53" stroke="#CA8A04" stroke-width="1.9" stroke-linecap="round"/>
+    <line x1="15" y1="53" x2="41" y2="53" stroke="#CA8A04" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <span class="odk-brand-name">ODK</span>
+  <div class="odk-gold-line"></div>
+  <span class="odk-brand-sub">Gestión de solicitudes</span>
+</div>
+""", unsafe_allow_html=True)
+
+        result = db.validate_and_use_token(token)
+        status = result.get("status")
+
+        if status == "ok":
+            aprobada = result["action"] == "approve"
+            color  = "#16a34a" if aprobada else "#dc2626"
+            bg     = "rgba(22,163,74,.10)" if aprobada else "rgba(220,38,38,.10)"
+            icon   = "✓" if aprobada else "✗"
+            titulo = "Solicitud aprobada" if aprobada else "Solicitud denegada"
+            st.markdown(f"""
+<div style="background:{bg};border:1px solid {color};border-radius:14px;padding:28px 24px;text-align:center;margin-bottom:16px;">
+  <div style="font-size:2.8rem;color:{color};margin-bottom:8px;">{icon}</div>
+  <div style="color:#f0e8d5;font-family:'Montserrat',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:.06em;margin-bottom:6px;">{titulo}</div>
+  <div style="color:rgba(220,195,140,.70);font-family:'Montserrat',sans-serif;font-size:.85rem;">
+    {result.get('emp_nombre','')} &middot; {result.get('tipo','').replace('_',' ').title()}<br>
+    {result.get('fecha_ini','')} &rarr; {result.get('fecha_fin','')}
+  </div>
+</div>
+<p style="color:rgba(220,195,140,.45);font-family:'Montserrat',sans-serif;font-size:.75rem;text-align:center;letter-spacing:.04em;">
+  Se ha notificado al empleado por email. Puedes cerrar esta ventana.
+</p>
+""", unsafe_allow_html=True)
+
+        elif status == "used":
+            already = result.get("estado", result.get("action",""))
+            st.markdown(f"""
+<div style="background:rgba(202,138,4,.08);border:1px solid rgba(202,138,4,.25);border-radius:14px;padding:24px;text-align:center;">
+  <div style="color:#CA8A04;font-size:1.8rem;margin-bottom:8px;">⚠</div>
+  <div style="color:#f0e8d5;font-family:'Montserrat',sans-serif;font-weight:700;margin-bottom:6px;">Enlace ya utilizado</div>
+  <div style="color:rgba(220,195,140,.60);font-family:'Montserrat',sans-serif;font-size:.82rem;">Esta solicitud ya fue procesada{f' ({already})' if already else ''}.</div>
+</div>
+""", unsafe_allow_html=True)
+
+        elif status == "expired":
+            st.markdown("""
+<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.22);border-radius:14px;padding:24px;text-align:center;">
+  <div style="color:#dc2626;font-size:1.8rem;margin-bottom:8px;">⏰</div>
+  <div style="color:#f0e8d5;font-family:'Montserrat',sans-serif;font-weight:700;margin-bottom:6px;">Enlace caducado</div>
+  <div style="color:rgba(220,195,140,.60);font-family:'Montserrat',sans-serif;font-size:.82rem;">Los enlaces de aprobación caducan a las 72 h. Accede a la app para gestionar la solicitud.</div>
+</div>
+""", unsafe_allow_html=True)
+
+        else:
+            st.markdown("""
+<div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.22);border-radius:14px;padding:24px;text-align:center;">
+  <div style="color:#dc2626;font-size:1.8rem;margin-bottom:8px;">✗</div>
+  <div style="color:#f0e8d5;font-family:'Montserrat',sans-serif;font-weight:700;margin-bottom:6px;">Enlace no válido</div>
+  <div style="color:rgba(220,195,140,.60);font-family:'Montserrat',sans-serif;font-size:.82rem;">Si crees que esto es un error, contacta con el administrador.</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
@@ -3302,7 +3381,11 @@ def main():
 
     st.markdown(STYLES, unsafe_allow_html=True)
 
-
+    # ── One-click email token handler (no login required) ─────────────────────
+    tok = st.query_params.get("tok", "")
+    if tok:
+        page_token_action(tok)
+        return
 
     if not logged_in():
 
