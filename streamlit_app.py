@@ -4,12 +4,21 @@ import streamlit as st
 
 import re as _re
 
-# ── HTML blank-line fix ───────────────────────────────────────────────────────
+# ── HTML render fix ───────────────────────────────────────────────────────────
 # Patch DeltaGenerator.markdown so ALL containers (columns, expanders, tabs…)
-# get blank lines stripped from HTML — not just st.markdown.
+# render HTML correctly.  Two bugs fixed:
+#   1. Blank lines break CommonMark HTML blocks → strip them.
+#   2. ≥4 spaces of indentation = CommonMark code-block → dedent first.
+import textwrap as _textwrap
+
 def _fix_html(body, kwargs):
     if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
-        return _re.sub(r'\n[ \t]*\n', '\n', body)
+        # Step 1: dedent (remove common leading whitespace so no line starts
+        # with 4+ spaces, which CommonMark would treat as a code block)
+        body = _textwrap.dedent(body)
+        # Step 2: collapse blank lines (CommonMark HTML blocks end at blank lines)
+        body = _re.sub(r'\n[ \t]*\n', '\n', body)
+        return body
     return body
 
 try:
