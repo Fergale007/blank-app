@@ -4,6 +4,7 @@ import streamlit as st
 
 import re as _re
 import textwrap as _textwrap
+from PIL import Image as _PILImage
 
 # ── HTML render fix (definitive) ──────────────────────────────────────────────
 # Two CommonMark bugs killed HTML rendering:
@@ -62,7 +63,7 @@ st.set_page_config(
 
     page_title="Ficha · Control Horario",
 
-    page_icon="🍸",
+    page_icon=_PILImage.open("icon.png"),
 
     layout="wide",
 
