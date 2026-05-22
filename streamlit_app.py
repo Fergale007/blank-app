@@ -3,35 +3,41 @@
 import streamlit as st
 
 import re as _re
-
-# ── HTML render fix ───────────────────────────────────────────────────────────
-# Patch DeltaGenerator.markdown so ALL containers (columns, expanders, tabs…)
-# render HTML correctly.  Two bugs fixed:
-#   1. Blank lines break CommonMark HTML blocks → strip them.
-#   2. ≥4 spaces of indentation = CommonMark code-block → dedent first.
 import textwrap as _textwrap
 
-def _fix_html(body, kwargs):
-    if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
-        # 1. dedent — removes common leading whitespace (4+ spaces = code block in CommonMark)
-        # 2. strip  — removes the leading \n that would push <div> away from column 0
-        # 3. re.sub — collapses blank lines (CommonMark HTML block ends at first blank line)
-        body = _textwrap.dedent(body).strip()
-        body = _re.sub(r'\n[ \t]*\n', '\n', body)
-        return body
+# ── HTML render fix (definitive) ──────────────────────────────────────────────
+# Two CommonMark bugs killed HTML rendering:
+#   1. ≥4 leading spaces → code block  →  fix: textwrap.dedent().strip()
+#   2. Blank line inside HTML block → block ends early  →  fix: re.sub blank lines
+#
+# Patch strategy: patch BOTH st.markdown (module-level) AND DeltaGenerator.markdown
+# (container-level: col.markdown, tab.markdown, expander.markdown, etc.)
+# The st.markdown patch is applied FIRST so it is always active.
+
+def _clean_html(body: str) -> str:
+    body = _textwrap.dedent(body).strip()
+    body = _re.sub(r'\n[ \t]*\n', '\n', body)
     return body
 
+# ① Patch st.markdown (module-level — catches all direct st.markdown() calls)
+_st_md_orig = st.markdown
+def _st_md_patched(body, **kwargs):
+    if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
+        body = _clean_html(body)
+    return _st_md_orig(body, **kwargs)
+st.markdown = _st_md_patched
+
+# ② Patch DeltaGenerator.markdown (catches col.markdown(), tab.markdown(), etc.)
 try:
     from streamlit.delta_generator import DeltaGenerator as _DG
     _dg_md_orig = _DG.markdown
     def _dg_md_patched(self, body, **kwargs):
-        return _dg_md_orig(self, _fix_html(body, kwargs), **kwargs)
+        if kwargs.get("unsafe_allow_html") and isinstance(body, str) and "<" in body:
+            body = _clean_html(body)
+        return _dg_md_orig(self, body, **kwargs)
     _DG.markdown = _dg_md_patched
 except Exception:
-    _st_markdown_orig = st.markdown
-    def _st_markdown_fixed(body, **kwargs):
-        return _st_markdown_orig(_fix_html(body, kwargs), **kwargs)
-    st.markdown = _st_markdown_fixed
+    pass  # st.markdown already patched above — this is just extra coverage
 # ─────────────────────────────────────────────────────────────────────────────
 
 import pandas as pd
@@ -288,121 +294,133 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 LOGIN_CSS = """
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Rubik:wght@300;400;500;600;700&display=swap');
 
-/* Full-page dark background */
+/* ── Vibrant dark background — modern cocktail brand ── */
 .stApp {
   background:
-    radial-gradient(ellipse 70% 55% at 50% 110%, rgba(202,138,4,.10) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 20% 20%,  rgba(180,100,0,.05) 0%, transparent 55%),
-    linear-gradient(160deg, #0a0804 0%, #120d04 55%, #0d0b08 100%) !important;
+    radial-gradient(ellipse 65% 55% at 15% 85%, rgba(124,58,237,.22) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 50% at 85% 15%, rgba(244,63,94,.14) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 35% at 50% 50%, rgba(124,58,237,.06) 0%, transparent 60%),
+    linear-gradient(145deg, #0a0812 0%, #0f0f23 55%, #0d0a18 100%) !important;
   min-height:100vh;
 }
 
 /* Hide Streamlit chrome */
-[data-testid="stSidebar"]          { display:none !important; }
-header[data-testid="stHeader"]     { background:transparent !important; box-shadow:none !important; }
-[data-testid="stToolbar"]          { display:none !important; }
-[data-testid="stStatusWidget"]     { display:none !important; }
-[data-testid="stDeployButton"]     { display:none !important; }
-#MainMenu, footer                  { display:none !important; visibility:hidden !important; }
+[data-testid="stSidebar"]      { display:none !important; }
+header[data-testid="stHeader"] { background:transparent !important; box-shadow:none !important; }
+[data-testid="stToolbar"]      { display:none !important; }
+[data-testid="stStatusWidget"] { display:none !important; }
+[data-testid="stDeployButton"] { display:none !important; }
+#MainMenu, footer              { display:none !important; visibility:hidden !important; }
 
-/* Top padding */
-.block-container { padding-top:5vh !important; padding-bottom:2rem !important; max-width:100% !important; }
+.block-container { padding-top:4vh !important; padding-bottom:2rem !important; max-width:100% !important; }
 
-/* ODK brand header */
-.odk-brand-wrap  { text-align:center; padding:36px 24px 24px; }
-.odk-brand-name  {
-  font-family:'Cormorant Garamond', Georgia, serif;
-  font-style:italic; font-weight:600;
-  font-size:3.8rem; letter-spacing:.26em; line-height:1;
-  color:#CA8A04;
-  text-shadow:0 0 50px rgba(202,138,4,.42), 0 2px 20px rgba(202,138,4,.16);
-  display:block; margin:12px 0 0;
-}
-.odk-brand-sub   {
-  font-family:'Montserrat', sans-serif;
-  font-size:.68rem; font-weight:500;
-  letter-spacing:.34em; text-transform:uppercase;
-  color:rgba(228,206,152,.42);
-  display:block; margin-top:7px;
-}
-.odk-gold-line   {
-  width:52px; height:1px;
-  background:linear-gradient(90deg, transparent, #CA8A04 45%, transparent);
-  margin:13px auto 0;
+/* ── ODK brand — bold, geometric, modern ── */
+.odk-brand-wrap { text-align:center; padding:32px 20px 22px; }
+
+.odk-logo-ring {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:62px; height:62px; border-radius:18px;
+  background:linear-gradient(135deg, #7C3AED, #F43F5E);
+  margin-bottom:14px;
+  box-shadow:0 0 32px rgba(124,58,237,.45), 0 8px 24px rgba(0,0,0,.3);
 }
 
-/* Glass form card */
+.odk-brand-name {
+  font-family:'Outfit', sans-serif;
+  font-weight:800; font-style:normal;
+  font-size:2.8rem; letter-spacing:.18em; line-height:1;
+  color:#fff;
+  text-shadow:0 0 40px rgba(124,58,237,.5);
+  display:block; margin-bottom:6px;
+}
+
+.odk-brand-sub {
+  font-family:'Outfit', sans-serif;
+  font-size:.72rem; font-weight:500;
+  letter-spacing:.28em; text-transform:uppercase;
+  color:rgba(226,232,240,.38);
+  display:block; margin-top:4px;
+}
+
+.odk-accent-bar {
+  width:40px; height:3px;
+  background:linear-gradient(90deg, #7C3AED, #F43F5E);
+  border-radius:2px;
+  margin:12px auto 0;
+}
+
+/* ── Glass form card ── */
 [data-testid="stForm"] {
-  background:rgba(255,255,255,.038) !important;
-  backdrop-filter:blur(28px) saturate(1.4) !important;
-  -webkit-backdrop-filter:blur(28px) saturate(1.4) !important;
-  border:1px solid rgba(202,138,4,.20) !important;
-  border-radius:16px !important;
+  background:rgba(255,255,255,.055) !important;
+  backdrop-filter:blur(20px) saturate(1.6) !important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.6) !important;
+  border:1px solid rgba(124,58,237,.30) !important;
+  border-radius:20px !important;
   padding:28px 26px 24px !important;
   box-shadow:
-    0 0 0 1px rgba(202,138,4,.05),
-    0 28px 72px rgba(0,0,0,.48),
-    inset 0 1px 0 rgba(255,255,255,.055) !important;
+    0 0 0 1px rgba(124,58,237,.08),
+    0 24px 64px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.08) !important;
 }
 
-/* Input labels */
+/* ── Input labels ── */
 .stTextInput > label {
-  font-family:'Montserrat', sans-serif !important;
-  font-size:.70rem !important; font-weight:600 !important;
-  letter-spacing:.18em !important; text-transform:uppercase !important;
-  color:rgba(220,195,140,.68) !important;
+  font-family:'Outfit', sans-serif !important;
+  font-size:.72rem !important; font-weight:600 !important;
+  letter-spacing:.14em !important; text-transform:uppercase !important;
+  color:rgba(226,232,240,.60) !important;
 }
 
-/* Input fields */
+/* ── Input fields ── */
 .stTextInput input {
-  background:rgba(255,255,255,.055) !important;
-  border:1px solid rgba(202,138,4,.22) !important;
-  border-radius:10px !important;
-  color:#f0e8d5 !important;
-  font-family:'Montserrat', sans-serif !important;
-  font-size:.9rem !important; letter-spacing:.02em !important;
+  background:rgba(255,255,255,.07) !important;
+  border:1px solid rgba(124,58,237,.28) !important;
+  border-radius:12px !important;
+  color:#e2e8f0 !important;
+  font-family:'Outfit', sans-serif !important;
+  font-size:.95rem !important;
   transition:border-color .2s, box-shadow .2s !important;
 }
 .stTextInput input:focus {
-  border-color:rgba(202,138,4,.65) !important;
-  box-shadow:0 0 0 3px rgba(202,138,4,.12), 0 2px 10px rgba(202,138,4,.08) !important;
+  border-color:rgba(124,58,237,.75) !important;
+  box-shadow:0 0 0 3px rgba(124,58,237,.16), 0 2px 12px rgba(124,58,237,.10) !important;
   outline:none !important;
 }
-.stTextInput input::placeholder { color:rgba(220,195,140,.28) !important; }
+.stTextInput input::placeholder { color:rgba(226,232,240,.22) !important; }
 
-/* Submit button */
+/* ── Submit button ── */
 [data-testid="stFormSubmitButton"] > button {
-  background:linear-gradient(135deg, #8a5d08 0%, #CA8A04 48%, #b8760a 100%) !important;
-  border:none !important; border-radius:10px !important;
-  color:#0a0804 !important;
-  font-family:'Montserrat', sans-serif !important;
-  font-weight:700 !important; font-size:.80rem !important;
-  letter-spacing:.24em !important; text-transform:uppercase !important;
+  background:linear-gradient(135deg, #7C3AED 0%, #a855f7 50%, #F43F5E 100%) !important;
+  border:none !important; border-radius:12px !important;
+  color:#fff !important;
+  font-family:'Outfit', sans-serif !important;
+  font-weight:700 !important; font-size:.85rem !important;
+  letter-spacing:.18em !important; text-transform:uppercase !important;
   padding:13px !important; width:100% !important;
-  box-shadow:0 6px 24px rgba(202,138,4,.28), 0 2px 8px rgba(0,0,0,.30) !important;
-  transition:all .25s ease !important;
+  box-shadow:0 6px 28px rgba(124,58,237,.38), 0 2px 8px rgba(0,0,0,.25) !important;
+  transition:all .22s ease !important;
+  cursor:pointer !important;
 }
 [data-testid="stFormSubmitButton"] > button:hover {
-  transform:translateY(-1px) !important;
-  box-shadow:0 10px 32px rgba(202,138,4,.42), 0 4px 14px rgba(0,0,0,.35) !important;
-  background:linear-gradient(135deg, #9a6a0e 0%, #d99e14 48%, #c48610 100%) !important;
+  transform:translateY(-2px) !important;
+  box-shadow:0 12px 36px rgba(124,58,237,.50), 0 4px 16px rgba(244,63,94,.20) !important;
 }
 
-/* Error alert */
+/* ── Error alert ── */
 [data-testid="stAlert"] {
-  background:rgba(180,20,20,.12) !important;
-  border:1px solid rgba(200,50,50,.28) !important;
-  border-radius:10px !important; color:#fca5a5 !important;
+  background:rgba(244,63,94,.10) !important;
+  border:1px solid rgba(244,63,94,.28) !important;
+  border-radius:12px !important; color:#fda4af !important;
 }
 
-/* Footer help text */
+/* ── Footer ── */
 .odk-footer-txt {
-  font-family:'Montserrat', sans-serif;
-  font-size:.70rem; letter-spacing:.06em;
-  color:rgba(220,195,140,.32);
-  text-align:center; margin-top:14px; padding:0 4px;
+  font-family:'Outfit', sans-serif;
+  font-size:.72rem; letter-spacing:.04em;
+  color:rgba(226,232,240,.28);
+  text-align:center; margin-top:16px;
 }
 </style>
 
@@ -580,20 +598,18 @@ def page_login():
 
     with col:
 
-        # ── ODK brand header ──────────────────────────────────────────────────
+        # ── ODK brand header — modern, bold, vibrant ─────────────────────────
         st.markdown("""
 <div class="odk-brand-wrap">
-  <svg width="56" height="60" viewBox="0 0 56 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto">
-    <path d="M3 5 L28 39 L53 5 Z" stroke="#CA8A04" stroke-width="1.9" fill="rgba(202,138,4,0.08)" stroke-linejoin="round"/>
-    <path d="M17 21 L28 39 L39 21 Z" fill="rgba(202,138,4,0.18)"/>
-    <line x1="28" y1="39" x2="28" y2="53" stroke="#CA8A04" stroke-width="1.9" stroke-linecap="round"/>
-    <line x1="15" y1="53" x2="41" y2="53" stroke="#CA8A04" stroke-width="2.5" stroke-linecap="round"/>
-    <circle cx="46" cy="10" r="4.2" fill="rgba(202,138,4,0.42)" stroke="#CA8A04" stroke-width="1.3"/>
-    <path d="M46 5.8 Q40 0.5 34 7" stroke="#CA8A04" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-    <circle cx="46" cy="10" r="1.6" fill="#CA8A04"/>
-  </svg>
+  <div class="odk-logo-ring">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16 4 C9.4 4 4 9.4 4 16 C4 22.6 9.4 28 16 28 C22.6 28 28 22.6 28 16 C28 9.4 22.6 4 16 4Z" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/>
+      <path d="M10 16 L16 10 L22 16 L19 16 L19 22 L13 22 L13 16Z" fill="white" opacity="0.9"/>
+      <circle cx="23" cy="9" r="3" fill="rgba(255,255,255,0.7)"/>
+    </svg>
+  </div>
   <span class="odk-brand-name">ODK</span>
-  <div class="odk-gold-line"></div>
+  <div class="odk-accent-bar"></div>
   <span class="odk-brand-sub">Ficha &middot; Control Horario</span>
 </div>
 """, unsafe_allow_html=True)
