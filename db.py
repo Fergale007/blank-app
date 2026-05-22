@@ -107,10 +107,22 @@ class _PGConn:
 
     def fetchone(self):
         row = self._cur.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        class _Row(dict):
+            def __getitem__(self, key):
+                if isinstance(key, int):
+                    return list(self.values())[key]
+                return super().__getitem__(key)
+        return _Row(row)
 
     def fetchall(self):
-        return [dict(r) for r in (self._cur.fetchall() or [])]
+        class _Row(dict):
+            def __getitem__(self, key):
+                if isinstance(key, int):
+                    return list(self.values())[key]
+                return super().__getitem__(key)
+        return [_Row(r) for r in (self._cur.fetchall() or [])]
 
     def commit(self):
         self._cn.commit()
