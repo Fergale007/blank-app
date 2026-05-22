@@ -56,15 +56,21 @@ class _PGConn:
         import psycopg2.extras
         from urllib.parse import urlparse, unquote
         _p = urlparse(_PG_URL)
-        self._cn = psycopg2.connect(
-            host=_p.hostname,
-            port=_p.port or 5432,
-            dbname=(_p.path or "/postgres").lstrip("/"),
-            user=unquote(_p.username or "postgres"),
-            password=unquote(_p.password or ""),
-            sslmode="require",
-            connect_timeout=10,
-        )
+        _host  = _p.hostname or ""
+        _port  = _p.port or 5432
+        _db    = (_p.path or "/postgres").lstrip("/")
+        _user  = unquote(_p.username or "postgres")
+        _pwd   = unquote(_p.password or "")
+        try:
+            self._cn = psycopg2.connect(
+                host=_host, port=_port, dbname=_db,
+                user=_user, password=_pwd,
+                sslmode="require", connect_timeout=10,
+            )
+        except Exception as _e:
+            raise RuntimeError(
+                f"PG_FAIL host={_host} port={_port} user={_user!r} db={_db!r} err={_e}"
+            ) from None
         self._cur = self._cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.lastrowid = None
 
