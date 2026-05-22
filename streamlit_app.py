@@ -62,6 +62,8 @@ from datetime import datetime, date, timedelta
 
 from io import BytesIO
 
+import base64 as _b64
+
 import db
 
 
@@ -79,6 +81,48 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 
 )
+
+
+
+# ── Inject apple-touch-icon + PWA manifest into parent <head> ─────────────────
+# st.components injects into an iframe; we reach window.parent to set the real
+# favicon + apple-touch-icon so mobile "Add to Home Screen" uses our ODK icon.
+
+def _inject_pwa_icons():
+    icon_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "icon.png")
+    if not _os.path.exists(icon_path):
+        return
+    with open(icon_path, "rb") as _f:
+        _icon_b64 = _b64.b64encode(_f.read()).decode()
+    _data_url = f"data:image/png;base64,{_icon_b64}"
+    _manifest_json = _b64.b64encode(b'{"name":"ODK Ficha","short_name":"ODK Ficha","icons":[{"src":"","sizes":"512x512","type":"image/png"}],"display":"standalone","background_color":"#0a0812","theme_color":"#7C3AED","start_url":"/"}').decode()
+    st.components.v1.html(f"""
+<script>
+(function(){{
+  var ico = '{_data_url}';
+  function patch(doc) {{
+    try {{
+      // favicon
+      var lk = doc.querySelector('link[rel~="icon"]');
+      if (!lk) {{ lk = doc.createElement('link'); lk.rel = 'icon'; doc.head.appendChild(lk); }}
+      lk.type = 'image/png'; lk.href = ico;
+      // apple touch icon
+      var al = doc.querySelector('link[rel="apple-touch-icon"]');
+      if (!al) {{ al = doc.createElement('link'); al.rel = 'apple-touch-icon'; doc.head.appendChild(al); }}
+      al.href = ico;
+      // theme-color
+      var tc = doc.querySelector('meta[name="theme-color"]');
+      if (!tc) {{ tc = doc.createElement('meta'); tc.name = 'theme-color'; doc.head.appendChild(tc); }}
+      tc.content = '#7C3AED';
+    }} catch(e) {{}}
+  }}
+  patch(document);
+  try {{ patch(window.parent.document); }} catch(e) {{}}
+}})();
+</script>
+""", height=0)
+
+_inject_pwa_icons()
 
 
 
@@ -925,11 +969,134 @@ def page_perfil():
 
 
 
+def _offline_sync_js():
+    """
+    Inject offline-aware JS into the fichaje page.
+    ─ Intercepts ENTRADA/SALIDA/PAUSA button clicks when navigator.onLine == false
+    ─ Stores actions in localStorage with real timestamp
+    ─ On reconnect (or page reload while online) encodes queue as ?sync=<b64>
+      so the Python side can process and clear it.
+    """
+    st.components.v1.html("""
+<script>
+(function(){
+  var KEY = 'odk_pending_fichajes';
+  var TIPOS = {ENTRADA:'entrada', SALIDA:'salida', PAUSA:'pausa', REANUDAR:'fin_pausa'};
+
+  // ── Toast notification ────────────────────────────────────────────────────
+  function toast(msg, color) {
+    var d = window.parent.document.createElement('div');
+    d.innerText = msg;
+    Object.assign(d.style, {
+      position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)',
+      background: color || '#7C3AED', color:'white', padding:'10px 22px',
+      borderRadius:'24px', zIndex:'99999', fontSize:'14px', fontWeight:'600',
+      boxShadow:'0 4px 20px rgba(0,0,0,.3)', transition:'opacity .5s'
+    });
+    window.parent.document.body.appendChild(d);
+    setTimeout(function(){ d.style.opacity='0'; setTimeout(function(){ d.remove(); }, 600); }, 3000);
+  }
+
+  // ── Offline banner ────────────────────────────────────────────────────────
+  var banner = null;
+  function showBanner(show) {
+    var doc = window.parent.document;
+    if (show) {
+      if (banner) return;
+      banner = doc.createElement('div');
+      banner.id = 'odk-offline-banner';
+      banner.innerHTML = '📵 Sin conexión &nbsp;·&nbsp; Los fichajes se guardarán y sincronizarán al reconectar';
+      Object.assign(banner.style, {
+        position:'fixed', top:'0', left:'0', right:'0', zIndex:'99998',
+        background:'linear-gradient(90deg,#7C3AED,#F43F5E)', color:'white',
+        textAlign:'center', padding:'8px', fontSize:'13px', fontWeight:'600'
+      });
+      doc.body.prepend(banner);
+    } else {
+      var b = doc.getElementById('odk-offline-banner');
+      if (b) b.remove(); banner = null;
+    }
+  }
+
+  // ── On reconnect: reload with ?sync=... ──────────────────────────────────
+  function syncIfPending() {
+    var raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    var queue = JSON.parse(raw);
+    if (!queue.length) return;
+    var enc = btoa(unescape(encodeURIComponent(JSON.stringify(queue))));
+    var url = new URL(window.parent.location.href);
+    url.searchParams.set('sync', enc);
+    window.parent.location.href = url.toString();
+  }
+
+  window.addEventListener('online',  function(){ showBanner(false); toast('✅ Conexión restaurada — sincronizando...','#059669'); syncIfPending(); });
+  window.addEventListener('offline', function(){ showBanner(true); toast('📵 Sin conexión — fichajes guardados localmente','#F43F5E'); });
+
+  if (!navigator.onLine) showBanner(true);
+
+  // ── Auto-sync on load if pending and online ──────────────────────────────
+  if (navigator.onLine) syncIfPending();
+
+  // ── Intercept button clicks when offline (capture phase) ─────────────────
+  window.parent.document.addEventListener('click', function(e) {
+    if (navigator.onLine) return;
+    var btn = e.target.closest('[data-testid="stBaseButton-primary"] button, [data-testid="stBaseButton-secondary"] button, .stButton > button, [data-testid="stButton"] > button');
+    if (!btn) return;
+    var txt = btn.innerText.toUpperCase();
+    var tipo = null;
+    for (var k in TIPOS) { if (txt.indexOf(k) !== -1) { tipo = TIPOS[k]; break; } }
+    if (!tipo) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    var queue = JSON.parse(localStorage.getItem(KEY) || '[]');
+    queue.push({tipo: tipo, ts: new Date().toISOString()});
+    localStorage.setItem(KEY, JSON.stringify(queue));
+    toast('📵 ' + tipo.toUpperCase() + ' guardado — se sincronizará al reconectar', '#7C3AED');
+  }, true);
+})();
+</script>
+""", height=0)
+
+
 def page_fichaje():
 
     user = current_user()
 
+    # ── Offline sync: process any pending fichajes stored in localStorage ─────
+    _sync_raw = st.query_params.get("sync", "")
+    if _sync_raw:
+        import json as _json
+        try:
+            _pending = _json.loads(_b64.b64decode(_sync_raw + "==").decode("utf-8", errors="replace"))
+            _synced  = 0
+            for _act in _pending:
+                _tipo = _act.get("tipo")
+                _ts   = _act.get("ts", "")
+                if not _tipo:
+                    continue
+                try:
+                    from zoneinfo import ZoneInfo
+                    _dt  = datetime.fromisoformat(_ts).astimezone(ZoneInfo("Europe/Madrid"))
+                    _dfe = _dt.date()
+                    _hfe = _dt.strftime("%H:%M")
+                except Exception:
+                    _dfe = date.today()
+                    _hfe = datetime.now().strftime("%H:%M")
+                db.add_entry(user["id"], _dfe, _tipo, _hfe,
+                             observaciones="[Offline — sync automático]",
+                             is_manual=True, created_by=user["id"])
+                db.audit(user["id"], f"fichaje_{_tipo}_offline", "time_entries", None,
+                         {"fecha": str(_dfe), "hora": _hfe, "ts_original": _ts})
+                _synced += 1
+            if _synced:
+                st.success(f"✅ {_synced} fichaje(s) offline sincronizados correctamente.")
+            st.query_params.clear()
+        except Exception as _ex:
+            st.warning(f"⚠️ Error al sincronizar offline: {_ex}")
+            st.query_params.clear()
 
+    # ── Inject offline JS support ─────────────────────────────────────────────
+    _offline_sync_js()
 
     # ── Timezone: auto from provincia + manual override ──────────────────────
     # IMPORTANT: read the widget key 'tz_sel' directly here (Streamlit updates
