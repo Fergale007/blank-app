@@ -1122,6 +1122,36 @@ def page_fichaje():
     # ── Inject offline JS support ─────────────────────────────────────────────
     _offline_sync_js()
 
+    # ── Offline filing shortcut — link to GitHub Pages PWA ────────────────────
+    _gh_offline_url = (
+        "https://fergale007.github.io/blank-app/fichar.html"
+        f"#user:{user.get('username', '')}"
+    )
+    st.markdown(f"""
+<div style="
+  background:rgba(124,58,237,.07);
+  border:1px solid rgba(124,58,237,.22);
+  border-radius:14px;
+  padding:12px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:4px;
+">
+  <div style="font-size:.8rem;color:rgba(226,232,240,.65);line-height:1.45">
+    <strong style="color:rgba(167,139,250,.9)">📲 Sin cobertura?</strong>
+    &nbsp;Puedes fichar offline desde tu móvil.
+  </div>
+  <a href="{_gh_offline_url}" target="_blank" style="
+    background:linear-gradient(135deg,#7C3AED,#F43F5E);
+    color:#fff;
+    font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    padding:8px 14px;border-radius:9px;text-decoration:none;white-space:nowrap;flex-shrink:0;
+  ">Abrir →</a>
+</div>
+""", unsafe_allow_html=True)
+
     # ── Timezone: auto from provincia + manual override ──────────────────────
     # IMPORTANT: read the widget key 'tz_sel' directly here (Streamlit updates
     # widget keys in session_state BEFORE the script reruns, so reading it at
