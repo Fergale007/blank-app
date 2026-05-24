@@ -456,6 +456,18 @@ header[data-testid="stHeader"] { background:transparent !important; box-shadow:n
 }
 .stTextInput input::placeholder { color:rgba(226,232,240,.22) !important; }
 
+/* ── iOS Safari autofill — prevents white background making text invisible ── */
+.stTextInput input:-webkit-autofill,
+.stTextInput input:-webkit-autofill:hover,
+.stTextInput input:-webkit-autofill:focus,
+.stTextInput input:-webkit-autofill:active {
+  -webkit-text-fill-color:#e2e8f0 !important;
+  -webkit-box-shadow:0 0 0px 1000px #0f0f23 inset !important;
+  box-shadow:0 0 0px 1000px #0f0f23 inset !important;
+  transition:background-color 5000s ease-in-out 0s !important;
+  caret-color:#e2e8f0 !important;
+}
+
 /* ── Submit button ── */
 [data-testid="stFormSubmitButton"] > button {
   background:linear-gradient(135deg, #7C3AED 0%, #a855f7 50%, #F43F5E 100%) !important;
