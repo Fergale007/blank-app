@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -54,7 +54,7 @@
       overflow-x: hidden;
     }
 
-    /* ── SETUP SCREEN ────────────────────────────────────────── */
+    /* â”€â”€ SETUP SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #setup-screen {
       width: 100%;
       max-width: 360px;
@@ -189,7 +189,7 @@
       box-shadow: 0 3px 14px rgba(124,58,237,.3);
     }
 
-    /* ── MAIN SCREEN ─────────────────────────────────────────── */
+    /* â”€â”€ MAIN SCREEN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #main-screen {
       width: 100%;
       max-width: 360px;
@@ -300,7 +300,7 @@
     }
     .btn-change:active { color: #a78bfa; }
 
-    /* ── Filing buttons ──────────────────────────────────────── */
+    /* â”€â”€ Filing buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .fichar-btn {
       width: 100%;
       border: none;
@@ -378,7 +378,7 @@
     .btn-row .btn-text { display: none; } /* icon only on small size */
     .btn-row .btn-icon-wrap { margin: 0 auto; }
 
-    /* ── Info cells ──────────────────────────────────────────── */
+    /* â”€â”€ Info cells â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .info-row {
       display: flex;
       gap: 10px;
@@ -404,7 +404,7 @@
       color: var(--text);
     }
 
-    /* ── Sync bar ────────────────────────────────────────────── */
+    /* â”€â”€ Sync bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .sync-bar {
       background: rgba(124,58,237,.1);
       border: 1px solid rgba(124,58,237,.28);
@@ -440,7 +440,7 @@
     }
     .btn-sync:active { transform: scale(.96); }
 
-    /* ── Full app link ───────────────────────────────────────── */
+    /* â”€â”€ Full app link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .app-link {
       display: block;
       text-align: center;
@@ -452,7 +452,7 @@
     }
     .app-link:active { color: rgba(167,139,250,.8); }
 
-    /* ── Toast ──────────────────────────────────────────────── */
+    /* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #toast {
       position: fixed;
       bottom: calc(var(--safe-b) + 24px);
@@ -481,7 +481,7 @@
 </head>
 <body>
 
-<!-- ═══════════ SETUP SCREEN ═══════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â• SETUP SCREEN â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="setup-screen">
   <div class="logo-wrap">
     <img class="logo-img" src="icon.png" alt="ODK Ficha" onerror="this.style.display='none'">
@@ -491,8 +491,8 @@
   </div>
 
   <div class="glass-card">
-    <div class="card-title">Configuración inicial</div>
-    <div class="card-desc">Introduce tu usuario de ODK Ficha. Solo se hace una vez — después funciona sin internet.</div>
+    <div class="card-title">ConfiguraciÃ³n inicial</div>
+    <div class="card-desc">Introduce tu usuario de ODK Ficha. Solo se hace una vez â€” despuÃ©s funciona sin internet.</div>
 
     <label class="field-label" for="setup-input">Tu usuario</label>
     <input id="setup-input" class="text-input" type="text"
@@ -502,12 +502,12 @@
            autocorrect="off"
            spellcheck="false">
 
-    <button class="btn-primary" onclick="setupUser()">Guardar y empezar →</button>
+    <button class="btn-primary" onclick="setupUser()">Guardar y empezar â†’</button>
   </div>
 </div>
 
 
-<!-- ═══════════ MAIN SCREEN ═══════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â• MAIN SCREEN â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="main-screen">
 
   <!-- Top bar -->
@@ -523,8 +523,8 @@
   <div class="user-card">
     <div class="avatar" id="user-avatar">?</div>
     <div class="user-info">
-      <div class="user-name" id="user-name-display">—</div>
-      <div class="user-hint">ODK · Control Horario</div>
+      <div class="user-name" id="user-name-display">â€”</div>
+      <div class="user-hint">ODK Â· Control Horario</div>
     </div>
     <button class="btn-change" onclick="changeUser()">Cambiar</button>
   </div>
@@ -582,12 +582,12 @@
   <!-- Info row (last action + time) -->
   <div class="info-row" id="info-row">
     <div class="info-cell">
-      <div class="info-label">Última acción</div>
-      <div class="info-value" id="last-action-val">—</div>
+      <div class="info-label">Ãšltima acciÃ³n</div>
+      <div class="info-value" id="last-action-val">â€”</div>
     </div>
     <div class="info-cell">
       <div class="info-label">Hora</div>
-      <div class="info-value" id="last-action-time">—</div>
+      <div class="info-value" id="last-action-time">â€”</div>
     </div>
   </div>
 
@@ -595,14 +595,14 @@
   <div class="sync-bar hidden" id="sync-bar">
     <div class="sync-info">
       <span class="sync-count" id="sync-count">0</span> fichajes guardados
-      <br><span style="font-size:.7rem;opacity:.7">Se sincronizarán al reconectar</span>
+      <br><span style="font-size:.7rem;opacity:.7">Se sincronizarÃ¡n al reconectar</span>
     </div>
     <button class="btn-sync" onclick="syncNow()">Sincronizar</button>
   </div>
 
   <!-- Full app link -->
-  <a class="app-link" href="https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app" target="_blank">
-    Abrir ODK Ficha completo →
+  <a class="app-link" href="https://fergale007-odk-ficha.hf.space" target="_blank">
+    Abrir ODK Ficha completo â†’
   </a>
 
 </div><!-- /main-screen -->
@@ -610,14 +610,14 @@
 <div id="toast"></div>
 
 <script>
-var STREAMLIT = 'https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app';
+var STREAMLIT = 'https://fergale007-odk-ficha.hf.space';
 var KEY_USER  = 'odk_offline_user';
 var KEY_QUEUE = 'odk_offline_queue';
 var KEY_LAST  = 'odk_last_fichaje';
 
-var LABELS = { entrada:'Entrada', salida:'Salida', pausa:'Pausa', fin_pausa:'Reanudación' };
+var LABELS = { entrada:'Entrada', salida:'Salida', pausa:'Pausa', fin_pausa:'ReanudaciÃ³n' };
 
-// ── Boot ─────────────────────────────────────────────────────
+// â”€â”€ Boot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.addEventListener('DOMContentLoaded', function() {
 
   // Auto-setup from URL hash: fichar.html#user:nombre
@@ -652,7 +652,7 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// ── Setup ────────────────────────────────────────────────────
+// â”€â”€ Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function setupUser() {
   var val = (document.getElementById('setup-input').value || '').trim();
   if (!val) { showToast('Introduce tu usuario', '#F43F5E'); return; }
@@ -678,8 +678,8 @@ function showMain(user) {
 function changeUser() {
   var q = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
   var msg = q.length
-    ? '¿Cambiar de usuario? Hay ' + q.length + ' fichaje(s) pendiente(s) que se perderán.'
-    : '¿Cambiar de usuario?';
+    ? 'Â¿Cambiar de usuario? Hay ' + q.length + ' fichaje(s) pendiente(s) que se perderÃ¡n.'
+    : 'Â¿Cambiar de usuario?';
   if (!confirm(msg)) return;
   localStorage.removeItem(KEY_USER);
   localStorage.removeItem(KEY_QUEUE);
@@ -689,7 +689,7 @@ function changeUser() {
   setTimeout(function(){ document.getElementById('setup-input').focus(); }, 80);
 }
 
-// ── Fichaje ──────────────────────────────────────────────────
+// â”€â”€ Fichaje â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fichar(tipo) {
   var user = localStorage.getItem(KEY_USER) || '';
   var ts   = new Date().toISOString();
@@ -702,15 +702,15 @@ function fichar(tipo) {
   updateLastAction();
 
   if (navigator.onLine) {
-    showToast('✓ ' + LABELS[tipo] + ' registrada', '#059669');
+    showToast('âœ“ ' + LABELS[tipo] + ' registrada', '#059669');
     syncNow();
   } else {
-    showToast(LABELS[tipo] + ' guardada · sincroniza al reconectar', '#7C3AED');
+    showToast(LABELS[tipo] + ' guardada Â· sincroniza al reconectar', '#7C3AED');
     updateQueue();
   }
 }
 
-// ── Sync ─────────────────────────────────────────────────────
+// â”€â”€ Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function syncIfPending() {
   var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
   if (queue.length) syncNow();
@@ -718,7 +718,7 @@ function syncIfPending() {
 
 function syncNow() {
   if (!navigator.onLine) {
-    showToast('Sin conexión — se sincronizará automáticamente', '#F43F5E');
+    showToast('Sin conexiÃ³n â€” se sincronizarÃ¡ automÃ¡ticamente', '#F43F5E');
     return;
   }
   var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
@@ -734,7 +734,7 @@ function syncNow() {
   }
 }
 
-// ── UI helpers ───────────────────────────────────────────────
+// â”€â”€ UI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function updateStatusPill() {
   var pill = document.getElementById('status-pill');
   var txt  = document.getElementById('status-text');
@@ -770,16 +770,16 @@ function updateLastAction() {
 
 function onOnline() {
   updateStatusPill();
-  showToast('Conexión restaurada · sincronizando...', '#059669');
+  showToast('ConexiÃ³n restaurada Â· sincronizando...', '#059669');
   setTimeout(syncIfPending, 600);
 }
 
 function onOffline() {
   updateStatusPill();
-  showToast('Sin conexión · los fichajes se guardan localmente', '#7C3AED');
+  showToast('Sin conexiÃ³n Â· los fichajes se guardan localmente', '#7C3AED');
 }
 
-// ── Toast ────────────────────────────────────────────────────
+// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 var _toastTid;
 function showToast(msg, color) {
   var t = document.getElementById('toast');
@@ -792,3 +792,4 @@ function showToast(msg, color) {
 </script>
 </body>
 </html>
+

@@ -1,11 +1,11 @@
-name: Keep ODK Ficha Alive
+﻿name: Keep ODK Ficha Alive
 
-# Pings the Streamlit app on a schedule to prevent sleep.
-# Public repo — unlimited free GitHub Actions minutes.
+# Pings the HF Space app on a schedule to keep it warm.
+# Public repo â€” unlimited free GitHub Actions minutes.
 #
 # Schedule (UTC times):
-#   Mon-Fri  05:00-22:00  every 30 min  → Canary Islands 06:00-23:00
-#   Sat-Sun  07:00-20:00  every 60 min  → keeps warm over weekends
+#   Mon-Fri  05:00-22:00  every 30 min  â†’ Canary Islands 06:00-23:00
+#   Sat-Sun  07:00-20:00  every 60 min  â†’ keeps warm over weekends
 
 on:
   schedule:
@@ -15,7 +15,7 @@ on:
 
 jobs:
   ping:
-    name: Ping Streamlit App
+    name: Ping HF Space
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
@@ -24,5 +24,6 @@ jobs:
         run: |
           echo "Ping at $(date -u)"
           curl -o /dev/null -s --max-time 55 \
-            "https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app" \
-            && echo "✅ OK" || echo "⚠️ timeout (cold start, will be warm now)"
+            "https://fergale007-odk-ficha.hf.space" \
+            && echo "âœ… OK" || echo "âš ï¸ timeout (cold start, will be warm now)"
+
