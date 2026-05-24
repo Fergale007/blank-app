@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ODK Fichar">
+  <meta name="theme-color" content="#7C3AED">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>ODK Fichar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --purple:  #7C3AED;
+      --rose:    #F43F5E;
+      --green:   #16a34a;
+      --teal:    #0d9488;
+      --amber:   #d97706;
+      --bg:      #0a0812;
+      --bg2:     #0f0f23;
+      --text:    #e2e8f0;
+      --muted:   rgba(226,232,240,.55);
+      --card:    rgba(255,255,255,.055);
+      --border:  rgba(124,58,237,.28);
+      --safe-t:  env(safe-area-inset-top, 0px);
+      --safe-b:  env(safe-area-inset-bottom, 0px);
+    }
+
+    html {
+      height: -webkit-fill-available;
+    }
+
+    body {
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(ellipse 65% 55% at 15% 85%, rgba(124,58,237,.22) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 50% at 85% 15%, rgba(244,63,94,.14) 0%, transparent 50%),
+        linear-gradient(145deg, #0a0812 0%, #0f0f23 55%, #0d0a18 100%);
+      color: var(--text);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: calc(var(--safe-t) + 20px) 20px calc(var(--safe-b) + 20px);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* ── SETUP SCREEN ────────────────────────────────────────── */
+    #setup-screen {
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin: auto;
+    }
+
+    .logo-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    .logo-img {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      box-shadow: 0 0 40px rgba(124,58,237,.5), 0 8px 24px rgba(0,0,0,.4);
+      margin-bottom: 14px;
+    }
+
+    .brand-name {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: .2em;
+      background: linear-gradient(135deg, #a78bfa, #f9a8d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .brand-sub {
+      font-size: .7rem;
+      font-weight: 500;
+      letter-spacing: .26em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .accent-bar {
+      width: 40px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--purple), var(--rose));
+      border-radius: 2px;
+      margin: 12px 0 0;
+    }
+
+    .glass-card {
+      width: 100%;
+      background: var(--card);
+      backdrop-filter: blur(20px) saturate(1.6);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px 24px;
+      box-shadow: 0 0 0 1px rgba(124,58,237,.08), 0 24px 64px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .card-desc {
+      font-size: .8rem;
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .text-input {
+      width: 100%;
+      background: rgba(255,255,255,.07);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: .95rem;
+      padding: 13px 16px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      caret-color: var(--text);
+    }
+    .text-input:focus {
+      border-color: rgba(124,58,237,.75);
+      box-shadow: 0 0 0 3px rgba(124,58,237,.16);
+    }
+    .text-input:-webkit-autofill,
+    .text-input:-webkit-autofill:focus {
+      -webkit-text-fill-color: var(--text) !important;
+      -webkit-box-shadow: 0 0 0px 1000px #0f0f23 inset !important;
+    }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      background: linear-gradient(135deg, var(--purple) 0%, #a855f7 50%, var(--rose) 100%);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: .85rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      padding: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 28px rgba(124,58,237,.4);
+      transition: transform .12s, box-shadow .12s;
+      -webkit-appearance: none;
+    }
+    .btn-primary:active {
+      transform: scale(.97);
+      box-shadow: 0 3px 14px rgba(124,58,237,.3);
+    }
+
+    /* ── MAIN SCREEN ─────────────────────────────────────────── */
+    #main-screen {
+      width: 100%;
+      max-width: 360px;
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .top-brand {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: .2em;
+      background: linear-gradient(135deg, #a78bfa, #f9a8d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 5px 11px;
+      border-radius: 20px;
+      transition: all .3s;
+    }
+    .status-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .pill-online  { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.35); color: #34d399; }
+    .pill-online .dot  { background: #34d399; box-shadow: 0 0 6px #34d399; }
+    .pill-offline { background: rgba(244,63,94,.10); border: 1px solid rgba(244,63,94,.30); color: #fb7185; }
+    .pill-offline .dot { background: #fb7185; }
+
+    /* User card */
+    .user-card {
+      background: var(--card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--purple), var(--rose));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    .user-info { flex: 1; min-width: 0; }
+    .user-name {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-hint {
+      font-size: .7rem;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .btn-change {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(167,139,250,.6);
+      font-family: 'Outfit', sans-serif;
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      padding: 6px 8px;
+      border-radius: 8px;
+      transition: color .2s;
+      flex-shrink: 0;
+    }
+    .btn-change:active { color: #a78bfa; }
+
+    /* ── Filing buttons ──────────────────────────────────────── */
+    .fichar-btn {
+      width: 100%;
+      border: none;
+      border-radius: 18px;
+      padding: 22px 20px 18px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: transform .1s, box-shadow .1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .fichar-btn:active { transform: scale(.97); }
+
+    .btn-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .btn-icon-wrap svg { display: block; }
+
+    .btn-text { text-align: left; }
+    .btn-label {
+      display: block;
+      font-family: 'Outfit', sans-serif;
+      font-size: .95rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.95);
+    }
+    .btn-sublabel {
+      display: block;
+      font-size: .72rem;
+      color: rgba(255,255,255,.5);
+      margin-top: 2px;
+    }
+
+    /* Button themes */
+    .btn-entrada {
+      background: linear-gradient(145deg, #14532d 0%, #166534 100%);
+      border: 1px solid rgba(34,197,94,.25);
+      box-shadow: 0 8px 28px rgba(22,163,74,.22), inset 0 1px 0 rgba(255,255,255,.1);
+    }
+    .btn-salida {
+      background: linear-gradient(145deg, #4c0519 0%, #881337 100%);
+      border: 1px solid rgba(244,63,94,.3);
+      box-shadow: 0 8px 28px rgba(244,63,94,.22), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .btn-pausa {
+      background: linear-gradient(145deg, #1c1917 0%, #3f2c0e 100%);
+      border: 1px solid rgba(217,119,6,.28);
+      box-shadow: 0 8px 28px rgba(217,119,6,.15), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .btn-reanudar {
+      background: linear-gradient(145deg, #0c1a2e 0%, #0f3460 100%);
+      border: 1px solid rgba(56,189,248,.25);
+      box-shadow: 0 8px 28px rgba(56,189,248,.12), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+
+    /* Two-col row for pause/resume */
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .btn-row .fichar-btn { padding: 18px 12px 14px; }
+    .btn-row .btn-text { display: none; } /* icon only on small size */
+    .btn-row .btn-icon-wrap { margin: 0 auto; }
+
+    /* ── Info cells ──────────────────────────────────────────── */
+    .info-row {
+      display: flex;
+      gap: 10px;
+    }
+    .info-cell {
+      flex: 1;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .info-label {
+      font-size: .65rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .info-value {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* ── Sync bar ────────────────────────────────────────────── */
+    .sync-bar {
+      background: rgba(124,58,237,.1);
+      border: 1px solid rgba(124,58,237,.28);
+      border-radius: 14px;
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .sync-info {
+      font-size: .78rem;
+      color: rgba(167,139,250,.9);
+      line-height: 1.4;
+    }
+    .sync-count { font-weight: 800; color: #a78bfa; }
+    .btn-sync {
+      background: linear-gradient(135deg, var(--purple), var(--rose));
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 9px 14px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: transform .1s;
+    }
+    .btn-sync:active { transform: scale(.96); }
+
+    /* ── Full app link ───────────────────────────────────────── */
+    .app-link {
+      display: block;
+      text-align: center;
+      font-size: .72rem;
+      color: rgba(167,139,250,.4);
+      text-decoration: none;
+      padding: 4px;
+      transition: color .2s;
+    }
+    .app-link:active { color: rgba(167,139,250,.8); }
+
+    /* ── Toast ──────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: calc(var(--safe-b) + 24px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--purple);
+      color: #fff;
+      padding: 11px 22px;
+      border-radius: 24px;
+      font-family: 'Outfit', sans-serif;
+      font-size: .85rem;
+      font-weight: 600;
+      box-shadow: 0 4px 24px rgba(0,0,0,.45);
+      opacity: 0;
+      transition: opacity .25s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 9999;
+      max-width: calc(100vw - 48px);
+      text-align: center;
+    }
+    #toast.show { opacity: 1; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════ SETUP SCREEN ═══════════ -->
+<div id="setup-screen">
+  <div class="logo-wrap">
+    <img class="logo-img" src="icon.png" alt="ODK Ficha" onerror="this.style.display='none'">
+    <div class="brand-name">ODK</div>
+    <div class="brand-sub">Control Horario</div>
+    <div class="accent-bar"></div>
+  </div>
+
+  <div class="glass-card">
+    <div class="card-title">Configuración inicial</div>
+    <div class="card-desc">Introduce tu usuario de ODK Ficha. Solo se hace una vez — después funciona sin internet.</div>
+
+    <label class="field-label" for="setup-input">Tu usuario</label>
+    <input id="setup-input" class="text-input" type="text"
+           placeholder="nombre.apellido"
+           autocomplete="username"
+           autocapitalize="none"
+           autocorrect="off"
+           spellcheck="false">
+
+    <button class="btn-primary" onclick="setupUser()">Guardar y empezar →</button>
+  </div>
+</div>
+
+
+<!-- ═══════════ MAIN SCREEN ═══════════ -->
+<div id="main-screen">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <span class="top-brand">ODK</span>
+    <span id="status-pill" class="status-pill pill-online">
+      <span class="dot"></span>
+      <span id="status-text">Online</span>
+    </span>
+  </div>
+
+  <!-- User card -->
+  <div class="user-card">
+    <div class="avatar" id="user-avatar">?</div>
+    <div class="user-info">
+      <div class="user-name" id="user-name-display">—</div>
+      <div class="user-hint">ODK · Control Horario</div>
+    </div>
+    <button class="btn-change" onclick="changeUser()">Cambiar</button>
+  </div>
+
+  <!-- ENTRADA -->
+  <button class="fichar-btn btn-entrada" onclick="fichar('entrada')">
+    <div class="btn-icon-wrap">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="rgba(134,239,172,1)">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+    </div>
+    <div class="btn-text">
+      <span class="btn-label">Entrada</span>
+      <span class="btn-sublabel">Inicio de jornada</span>
+    </div>
+  </button>
+
+  <!-- DESCANSO + REANUDAR -->
+  <div class="btn-row">
+    <button class="fichar-btn btn-pausa" onclick="fichar('pausa')">
+      <div class="btn-icon-wrap">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="rgba(252,211,77,1)">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+        </svg>
+      </div>
+      <div class="btn-text">
+        <span class="btn-label">Pausa</span>
+      </div>
+    </button>
+    <button class="fichar-btn btn-reanudar" onclick="fichar('fin_pausa')">
+      <div class="btn-icon-wrap">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="rgba(125,211,252,1)">
+          <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+        </svg>
+      </div>
+      <div class="btn-text">
+        <span class="btn-label">Reanudar</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- SALIDA -->
+  <button class="fichar-btn btn-salida" onclick="fichar('salida')">
+    <div class="btn-icon-wrap">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="rgba(253,164,175,1)">
+        <path d="M6 6h12v12H6z"/>
+      </svg>
+    </div>
+    <div class="btn-text">
+      <span class="btn-label">Salida</span>
+      <span class="btn-sublabel">Fin de jornada</span>
+    </div>
+  </button>
+
+  <!-- Info row (last action + time) -->
+  <div class="info-row" id="info-row">
+    <div class="info-cell">
+      <div class="info-label">Última acción</div>
+      <div class="info-value" id="last-action-val">—</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Hora</div>
+      <div class="info-value" id="last-action-time">—</div>
+    </div>
+  </div>
+
+  <!-- Sync bar (shown when queue > 0) -->
+  <div class="sync-bar hidden" id="sync-bar">
+    <div class="sync-info">
+      <span class="sync-count" id="sync-count">0</span> fichajes guardados
+      <br><span style="font-size:.7rem;opacity:.7">Se sincronizarán al reconectar</span>
+    </div>
+    <button class="btn-sync" onclick="syncNow()">Sincronizar</button>
+  </div>
+
+  <!-- Full app link -->
+  <a class="app-link" href="https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app" target="_blank">
+    Abrir ODK Ficha completo →
+  </a>
+
+</div><!-- /main-screen -->
+
+<div id="toast"></div>
+
+<script>
+var STREAMLIT = 'https://fergale007-blank-app-streamlit-app-claudespanish-timeshe-jm5a69.streamlit.app';
+var KEY_USER  = 'odk_offline_user';
+var KEY_QUEUE = 'odk_offline_queue';
+var KEY_LAST  = 'odk_last_fichaje';
+
+var LABELS = { entrada:'Entrada', salida:'Salida', pausa:'Pausa', fin_pausa:'Reanudación' };
+
+// ── Boot ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+
+  // Auto-setup from URL hash: fichar.html#user:nombre
+  var hash = window.location.hash || '';
+  if (hash.indexOf('#user:') === 0) {
+    var u = decodeURIComponent(hash.slice(6)).trim();
+    if (u) { localStorage.setItem(KEY_USER, u); history.replaceState(null,'', window.location.pathname); }
+  }
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/blank-app/sw.js').catch(function(){});
+  }
+
+  var user = localStorage.getItem(KEY_USER);
+  if (user) {
+    showMain(user);
+  } else {
+    document.getElementById('setup-screen').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('setup-input').focus(); }, 120);
+  }
+
+  window.addEventListener('online',  onOnline);
+  window.addEventListener('offline', onOffline);
+});
+
+// Allow Enter key on setup
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    var ss = document.getElementById('setup-screen');
+    if (ss && ss.style.display !== 'none') setupUser();
+  }
+});
+
+// ── Setup ────────────────────────────────────────────────────
+function setupUser() {
+  var val = (document.getElementById('setup-input').value || '').trim();
+  if (!val) { showToast('Introduce tu usuario', '#F43F5E'); return; }
+  localStorage.setItem(KEY_USER, val);
+  showMain(val);
+}
+
+function showMain(user) {
+  document.getElementById('setup-screen').style.display = 'none';
+  var ms = document.getElementById('main-screen');
+  ms.style.display = 'flex';
+
+  document.getElementById('user-name-display').textContent = user;
+  document.getElementById('user-avatar').textContent = user.charAt(0).toUpperCase();
+
+  updateStatusPill();
+  updateQueue();
+  updateLastAction();
+
+  if (navigator.onLine) syncIfPending();
+}
+
+function changeUser() {
+  var q = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
+  var msg = q.length
+    ? '¿Cambiar de usuario? Hay ' + q.length + ' fichaje(s) pendiente(s) que se perderán.'
+    : '¿Cambiar de usuario?';
+  if (!confirm(msg)) return;
+  localStorage.removeItem(KEY_USER);
+  localStorage.removeItem(KEY_QUEUE);
+  localStorage.removeItem(KEY_LAST);
+  document.getElementById('main-screen').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('setup-input').focus(); }, 80);
+}
+
+// ── Fichaje ──────────────────────────────────────────────────
+function fichar(tipo) {
+  var user = localStorage.getItem(KEY_USER) || '';
+  var ts   = new Date().toISOString();
+
+  var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
+  queue.push({ tipo: tipo, ts: ts, user: user });
+  localStorage.setItem(KEY_QUEUE, JSON.stringify(queue));
+  localStorage.setItem(KEY_LAST, JSON.stringify({ tipo: tipo, ts: ts }));
+
+  updateLastAction();
+
+  if (navigator.onLine) {
+    showToast('✓ ' + LABELS[tipo] + ' registrada', '#059669');
+    syncNow();
+  } else {
+    showToast(LABELS[tipo] + ' guardada · sincroniza al reconectar', '#7C3AED');
+    updateQueue();
+  }
+}
+
+// ── Sync ─────────────────────────────────────────────────────
+function syncIfPending() {
+  var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
+  if (queue.length) syncNow();
+}
+
+function syncNow() {
+  if (!navigator.onLine) {
+    showToast('Sin conexión — se sincronizará automáticamente', '#F43F5E');
+    return;
+  }
+  var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
+  if (!queue.length) return;
+
+  try {
+    var enc = btoa(unescape(encodeURIComponent(JSON.stringify(queue))));
+    localStorage.removeItem(KEY_QUEUE);
+    updateQueue();
+    window.location.href = STREAMLIT + '?sync=' + enc;
+  } catch(e) {
+    showToast('Error al preparar sync: ' + e.message, '#F43F5E');
+  }
+}
+
+// ── UI helpers ───────────────────────────────────────────────
+function updateStatusPill() {
+  var pill = document.getElementById('status-pill');
+  var txt  = document.getElementById('status-text');
+  if (!pill) return;
+  if (navigator.onLine) {
+    pill.className = 'status-pill pill-online';
+    txt.textContent = 'Online';
+  } else {
+    pill.className = 'status-pill pill-offline';
+    txt.textContent = 'Offline';
+  }
+}
+
+function updateQueue() {
+  var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
+  var bar   = document.getElementById('sync-bar');
+  document.getElementById('sync-count').textContent = queue.length;
+  if (queue.length > 0) bar.classList.remove('hidden');
+  else bar.classList.add('hidden');
+}
+
+function updateLastAction() {
+  var raw = localStorage.getItem(KEY_LAST);
+  if (!raw) return;
+  try {
+    var obj = JSON.parse(raw);
+    var dt  = new Date(obj.ts);
+    var timeStr = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('last-action-val').textContent  = LABELS[obj.tipo] || obj.tipo;
+    document.getElementById('last-action-time').textContent = timeStr;
+  } catch(e) {}
+}
+
+function onOnline() {
+  updateStatusPill();
+  showToast('Conexión restaurada · sincronizando...', '#059669');
+  setTimeout(syncIfPending, 600);
+}
+
+function onOffline() {
+  updateStatusPill();
+  showToast('Sin conexión · los fichajes se guardan localmente', '#7C3AED');
+}
+
+// ── Toast ────────────────────────────────────────────────────
+var _toastTid;
+function showToast(msg, color) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color || '#7C3AED';
+  t.classList.add('show');
+  clearTimeout(_toastTid);
+  _toastTid = setTimeout(function(){ t.classList.remove('show'); }, 2800);
+}
+</script>
+</body>
+</html>
