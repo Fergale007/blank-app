@@ -35,15 +35,20 @@ DB = "ficha.db"
 import os as _os
 import re as _re
 
+# ── Universal secret reader: st.secrets (Streamlit Cloud) → os.environ (HF Spaces / local) ──
+def _secret(key: str, default: str = "") -> str:
+    """Read secret from st.secrets first, fall back to os.environ. Works on both Streamlit Cloud and HF Spaces."""
+    try:
+        import streamlit as _st2
+        v = _st2.secrets.get(key, "")
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    return _os.environ.get(key, default)
+
 # ── Database backend: SQLite (local) or PostgreSQL (Supabase/Cloud) ───────────
-_PG_URL = ""
-try:
-    import streamlit as _st
-    _PG_URL = (_st.secrets.get("DATABASE_URL", "") or "")
-except Exception:
-    pass
-if not _PG_URL:
-    _PG_URL = _os.environ.get("DATABASE_URL", "")
+_PG_URL = _secret("DATABASE_URL") or ""
 _USE_PG = bool(_PG_URL)
 
 # ── Persistent per-thread PG connection (avoids reconnect on every query) ─────
@@ -232,14 +237,10 @@ def _sig_key() -> bytes:
     Key used to sign time_entries rows (LEG-01 tamper detection).
     Reads ENTRY_SIG_KEY secret; falls back to a hash of DATABASE_URL.
     """
-    try:
-        import streamlit as _st
-        k = _st.secrets.get("ENTRY_SIG_KEY", "")
-        if k:
-            return k.encode()
-    except Exception:
-        pass
-    base = _os.environ.get("ENTRY_SIG_KEY") or _os.environ.get("DATABASE_URL", "odk-ficha-dev")
+    k = _secret("ENTRY_SIG_KEY")
+    if k:
+        return k.encode()
+    base = _secret("DATABASE_URL") or "odk-ficha-dev"
     return hashlib.sha256(base.encode()).digest()
 
 
@@ -2284,15 +2285,14 @@ def send_vacation_email(to_email, empleado_nombre, tipo_aus, estado,
     if not to_email:
         return False
     try:
-        import smtplib, streamlit as st
+        import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
-        cfg = getattr(st, "secrets", {})
-        host = cfg.get("SMTP_HOST", "")
-        port = int(cfg.get("SMTP_PORT", 587))
-        smtp_user = cfg.get("SMTP_USER", "")
-        pwd  = cfg.get("SMTP_PASS", "")
-        frm  = cfg.get("SMTP_FROM", smtp_user)
+        host      = _secret("SMTP_HOST")
+        port      = int(_secret("SMTP_PORT") or 587)
+        smtp_user = _secret("SMTP_USER")
+        pwd       = _secret("SMTP_PASS")
+        frm       = _secret("SMTP_FROM") or smtp_user
         if not host or not smtp_user or not pwd:
             return False
 
@@ -2444,17 +2444,16 @@ def send_manager_request_email(manager_email: str, manager_nombre: str,
     if not manager_email:
         return False
     try:
-        import smtplib, streamlit as st
+        import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
-        cfg = getattr(st, "secrets", {})
-        host      = cfg.get("SMTP_HOST", "")
-        port      = int(cfg.get("SMTP_PORT", 587))
-        smtp_user = cfg.get("SMTP_USER", "")
-        pwd       = cfg.get("SMTP_PASS", "")
-        frm       = cfg.get("SMTP_FROM", smtp_user)
+        host      = _secret("SMTP_HOST")
+        port      = int(_secret("SMTP_PORT") or 587)
+        smtp_user = _secret("SMTP_USER")
+        pwd       = _secret("SMTP_PASS")
+        frm       = _secret("SMTP_FROM") or smtp_user
         if not app_url:
-            app_url = cfg.get("APP_URL", "https://ficha.streamlit.app")
+            app_url = _secret("APP_URL", "https://ficha.streamlit.app")
         if not host or not smtp_user or not pwd:
             return False
 
