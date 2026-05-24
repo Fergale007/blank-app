@@ -10,9 +10,7 @@
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="manifest" href="manifest.json">
   <title>ODK Fichar</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- No external fonts — page must work 100% offline -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -37,7 +35,7 @@
     }
 
     body {
-      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
       background:
         radial-gradient(ellipse 65% 55% at 15% 85%, rgba(124,58,237,.22) 0%, transparent 55%),
         radial-gradient(ellipse 55% 50% at 85% 15%, rgba(244,63,94,.14) 0%, transparent 50%),
@@ -690,9 +688,17 @@ function changeUser() {
 }
 
 // â”€â”€ Fichaje â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function localISOString() {
+  // Returns ISO-like string in LOCAL time (not UTC), e.g. "2026-05-24T09:30:00"
+  var d = new Date();
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+         'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
 function fichar(tipo) {
   var user = localStorage.getItem(KEY_USER) || '';
-  var ts   = new Date().toISOString();
+  var ts   = localISOString();  // local time, not UTC
 
   var queue = JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]');
   queue.push({ tipo: tipo, ts: ts, user: user });
