@@ -439,31 +439,42 @@ header[data-testid="stHeader"] { background:transparent !important; box-shadow:n
   color:rgba(226,232,240,.60) !important;
 }
 
-/* ── Input fields ── */
-.stTextInput input {
-  background:rgba(255,255,255,.07) !important;
-  border:1px solid rgba(124,58,237,.28) !important;
+/* ── Fix: BaseWeb container tiene fondo gris claro — lo reemplazamos ── */
+[data-baseweb="base-input"],
+[data-baseweb="input"] {
+  background-color:rgba(255,255,255,.08) !important;
   border-radius:12px !important;
-  color:#e2e8f0 !important;
-  font-family:'Outfit', sans-serif !important;
-  font-size:.95rem !important;
+  border:1px solid rgba(124,58,237,.28) !important;
   transition:border-color .2s, box-shadow .2s !important;
 }
-.stTextInput input:focus {
+[data-baseweb="base-input"]:focus-within,
+[data-baseweb="input"]:focus-within {
   border-color:rgba(124,58,237,.75) !important;
-  box-shadow:0 0 0 3px rgba(124,58,237,.16), 0 2px 12px rgba(124,58,237,.10) !important;
-  outline:none !important;
+  box-shadow:0 0 0 3px rgba(124,58,237,.16) !important;
 }
+
+/* ── Input fields ── */
+.stTextInput input {
+  background:transparent !important;
+  border:none !important;
+  border-radius:12px !important;
+  color:#e2e8f0 !important;
+  -webkit-text-fill-color:#e2e8f0 !important;
+  -webkit-appearance:none !important;
+  font-family:'Outfit', sans-serif !important;
+  font-size:.95rem !important;
+}
+.stTextInput input:focus { outline:none !important; box-shadow:none !important; }
 .stTextInput input::placeholder { color:rgba(226,232,240,.22) !important; }
 
-/* ── iOS Safari autofill — prevents white background making text invisible ── */
+/* ── iOS Safari autofill — fondo blanco invisible ── */
 .stTextInput input:-webkit-autofill,
 .stTextInput input:-webkit-autofill:hover,
 .stTextInput input:-webkit-autofill:focus,
 .stTextInput input:-webkit-autofill:active {
   -webkit-text-fill-color:#e2e8f0 !important;
-  -webkit-box-shadow:0 0 0px 1000px #0f0f23 inset !important;
-  box-shadow:0 0 0px 1000px #0f0f23 inset !important;
+  -webkit-box-shadow:0 0 0px 1000px #14102e inset !important;
+  box-shadow:0 0 0px 1000px #14102e inset !important;
   transition:background-color 5000s ease-in-out 0s !important;
   caret-color:#e2e8f0 !important;
 }
