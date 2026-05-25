@@ -121,7 +121,8 @@ class _PGConn:
     def execute(self, sql, params=()):
         sql, is_ignore = self._adapt(sql)
         is_ins  = sql.strip().upper().startswith("INSERT")
-        is_write = is_ins or bool(_re.match(r"\s*(UPDATE|DELETE)", sql, _re.I))
+        is_ddl  = bool(_re.match(r"\s*(ALTER|CREATE|DROP)", sql, _re.I))
+        is_write = is_ins or is_ddl or bool(_re.match(r"\s*(UPDATE|DELETE)", sql, _re.I))
         has_ret = "RETURNING" in sql.upper()
         if is_ins and not has_ret and not is_ignore:
             sql = sql.rstrip("; ") + " RETURNING id"
@@ -745,19 +746,29 @@ def init_db():
 
 
 
-    # Migration: add columns if not present (users)
-    for col, defval in [("provincia","''"), ("localidad","''"), ("cargo","''")]:
+    # Migration: add columns if not present.
+    # IMPORTANT: each migration runs in its own connection so a "column already exists"
+    # error in PostgreSQL doesn't abort the transaction and block subsequent migrations.
+    def _safe_add_column(table, col, defval):
         try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {defval}")
+            _mc = _conn()
+            if _USE_PG:
+                # IF NOT EXISTS avoids error entirely in PG 9.6+
+                _mc.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT ''")
+            else:
+                _mc.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT DEFAULT {defval}")
+            _mc.commit()
+            _mc.close()
         except Exception:
-            pass
+            try: _mc.close()
+            except Exception: pass
 
-    # Migration: LEG-01/02 — add entry_sig + retain_until to time_entries
+    for col, defval in [("provincia","''"), ("localidad","''"), ("cargo","''")]:
+        _safe_add_column("users", col, defval)
+
     for col, defval in [("entry_sig", "''"), ("retain_until", "''")]:
-        try:
-            c.execute(f"ALTER TABLE time_entries ADD COLUMN {col} TEXT DEFAULT {defval}")
-        except Exception:
-            pass
+        _safe_add_column("time_entries", col, defval)
+
     c.commit()
 
     _seed_holidays(c)
