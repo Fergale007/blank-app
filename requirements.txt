@@ -1,1 +1,7 @@
 streamlit
+pandas
+openpyxl
+plotly
+psycopg2-binary
+Pillow
+bcrypt
